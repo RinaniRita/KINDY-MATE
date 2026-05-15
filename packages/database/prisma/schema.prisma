@@ -1,0 +1,100 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  PARENT
+  KID
+}
+
+enum TaskType {
+  MATH
+  LITERATURE
+  LANGUAGE
+  PHYSICAL // Squat, jumping jack...
+  REAL_LIFE // Đọc sách giấy, dọn đồ chơi
+}
+
+enum TaskStatus {
+  ASSIGNED
+  PENDING_APPROVAL // Đang chờ AI hoặc phụ huynh nghiệm thu
+  COMPLETED
+  FAILED
+}
+
+enum PointTransactionType {
+  EARN  // Cộng điểm khi hoàn thành thử thách
+  SPEND // Trừ điểm khi đổi thời gian chơi game/xem video
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String?      @unique
+  passwordHash  String
+  role          Role         @default(PARENT)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Quan hệ: Một tài khoản phụ huynh quản lý nhiều hồ sơ trẻ em
+  children      KidProfile[]
+}
+
+model KidProfile {
+  id           String       @id @default(cuid())
+  parentId     String
+  parent       User         @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  name         String
+  birthDate    DateTime
+  pinCode      String       // Mã PIN 4 số để trẻ đăng nhập nhanh vào Kid-Zone
+  totalPoints  Int          @default(0) // Điểm hiện tại (Cache để query nhanh)
+  createdAt    DateTime     @default(now())
+  
+  tasks        Task[]
+  pointsLogs   PointsLedger[]
+  sessions     SessionLog[]
+}
+
+model Task {
+  id           String       @id @default(cuid())
+  kidId        String
+  kid          KidProfile   @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  type         TaskType
+  pointsReward Int
+  status       TaskStatus   @default(ASSIGNED)
+  metadata     Json?        // Lưu câu hỏi RAG hoặc cấu hình số lượt squat (e.g., { "target_squats": 10 })
+  createdAt    DateTime     @default(now())
+  completedAt  DateTime?
+}
+
+model PointsLedger {
+  id           String               @id @default(cuid())
+  kidId        String
+  kid          KidProfile           @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  type         PointTransactionType
+  amount       Int                  // Số điểm biến động
+  reason       String               // Lý do: "Completed 10 squats", "Watched 15m Video"
+  referenceId  String?              // Id của Task hoặc cấu hình phần thưởng liên quan
+  createdAt    DateTime             @default(now())
+
+  @@index([kidId]) // Tối ưu tốc độ query lịch sử điểm của từng đứa trẻ
+}
+
+model SessionLog {
+  id           String       @id @default(cuid())
+  kidId        String
+  kid          KidProfile   @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  startTime    DateTime     @default(now())
+  endTime      DateTime?
+  screenTimeMs Int          @default(0) // Tổng thời gian xem nội dung kích thích (nếu có)
+  
+  // Lưu hội thoại dạng mảng JSON phục vụ phân tích Therapist: [{role: "user", content: "..."}, {role: "assistant", content: "..."}]
+  chatHistory  Json?        
+  sentimentTag String?      // Kết quả phân tích tâm lý sau session: "HAPPY", "ANXIOUS", "FRUSTRATED"
+}
