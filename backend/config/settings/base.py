@@ -1,10 +1,15 @@
 # config/settings/base.py
 import os
+import environ
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = 'django-insecure-kindy-mate-placeholder-key-for-local-dev'
+env = environ.Env()
+# Load .env file from the root of the project
+environ.Env.read_env(os.path.join(BASE_DIR.parent, '.env'))
+
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-kindy-mate-placeholder-key-for-local-dev')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
