@@ -1,0 +1,16 @@
+{
+  "name": "@kindy-mate/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "next.js"
+  ],
+  "dependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.1.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.34.0"
+  }
+}
