@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ========================================================= */
+  /* DEFAULT / PARENT DASHBOARD: Tối giản, Chuyên nghiệp (Slate)*/
+  /* ========================================================= */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  /* ========================================================= */
+  /* KID-ZONE THEME: Bo tròn lớn, sắc màu Pastel tươi sáng    */
+  /* ========================================================= */
+  [data-theme="kid"] {
+    --background: 195 100% 97%;       /* Xanh mây nhạt mềm mại */
+    --foreground: 200 50% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 50% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 50% 20%;
+    
+    --primary: 340 82% 60%;            /* Hồng kẹo ngọt ngào cho nút bấm chính */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 48 100% 60%;          /* Vàng mặt trời phấn khởi */
+    --secondary-foreground: 200 50% 15%;
+    
+    --muted: 160 60% 93%;              /* Xanh lá mint dịu mắt */
+    --muted-foreground: 160 50% 30%;
+    
+    --accent: 260 85% 65%;             /* Tím mộng mơ/AI Mascot */
+    --accent-foreground: 0 0% 100%;
+    
+    --border: 195 40% 85%;
+    --input: 195 40% 85%;
+    --ring: 340 82% 60%;
+    --radius: 1.5rem;                  /* Bo tròn cực đại tạo cảm giác an toàn, thân thiện */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
