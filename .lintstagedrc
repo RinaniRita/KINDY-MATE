@@ -1,4 +1,0 @@
-{
-  "apps/**/*.{ts,tsx}": ["pnpm --filter web lint", "prettier --write"],
-  "packages/**/*.{ts,tsx}": ["prettier --write"]
-}
