@@ -36,6 +36,7 @@ class ChildProfileSerializer(serializers.ModelSerializer):
             'age',
             'avatar_id',
             'interests',
+            'favorite_subjects',
             'default_language',
             'is_active',
             'created_at',
@@ -44,11 +45,25 @@ class ChildProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'rules', 'wallet_balance']
 
+    def validate_age(self, value):
+        if not (2 <= value <= 8):
+            raise serializers.ValidationError("Độ tuổi của trẻ phải từ 2 đến 8 tuổi.")
+        return value
+
     def create(self, validated_data):
         child = ChildProfile.objects.create(parent=self.context['request'].user, **validated_data)
         ParentRule.objects.create(
             child=child,
-            allowed_categories=['documentary', 'entertainment', 'customization', 'reading', 'movement'],
+            allowed_categories=[
+                'documentary',
+                'entertainment',
+                'customization',
+                'learning',
+                'reading',
+                'movement',
+                'creative',
+                'mascot_item',
+            ],
         )
         RewardWallet.objects.create(child=child, points_balance=20, points_earned_total=20)
         return child

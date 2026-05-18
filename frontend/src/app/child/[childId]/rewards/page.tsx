@@ -1,11 +1,13 @@
 import { ChildLayout } from "@/components/child/ChildLayout";
 import { RewardShop } from "@/components/child/ChildExperience";
-import { demoChild } from "@/lib/mock-data";
 
-export default function RewardsPage() {
+type Params = Promise<{ childId: string }>;
+
+export default async function RewardsPage({ params }: { params: Params }) {
+  const { childId } = await params;
   return (
-    <ChildLayout childId={demoChild.id}>
-      <RewardShop />
+    <ChildLayout childId={childId}>
+      <RewardShop childId={childId} />
     </ChildLayout>
   );
 }

@@ -39,6 +39,7 @@
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
   --animate-wiggle: wiggle 0.5s ease-in-out infinite;
   --animate-bounce-gentle: bounce-gentle 2s ease-in-out infinite;
+  --animate-shake: shake 0.35s ease-in-out;
 
   @keyframes float {
     0%, 100% { transform: translateY(0px) rotate(0deg); }
@@ -59,6 +60,11 @@
   @keyframes bounce-gentle {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
   }
 }
 

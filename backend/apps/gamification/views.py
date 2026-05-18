@@ -30,7 +30,7 @@ def wallet_detail(request):
     return Response(RewardWalletSerializer(child.wallet).data)
 
 
-class RewardItemViewSet(viewsets.ReadOnlyModelViewSet):
+class RewardItemViewSet(viewsets.ModelViewSet):
     serializer_class = RewardItemSerializer
 
     def get_queryset(self):

@@ -1,11 +1,13 @@
 import { ChildHome } from "@/components/child/ChildExperience";
 import { ChildLayout } from "@/components/child/ChildLayout";
-import { demoChild } from "@/lib/mock-data";
 
-export default function ChildHomePage() {
+type Params = Promise<{ childId: string }>;
+
+export default async function ChildHomePage({ params }: { params: Params }) {
+  const { childId } = await params;
   return (
-    <ChildLayout childId={demoChild.id}>
-      <ChildHome />
+    <ChildLayout childId={childId}>
+      <ChildHome childId={childId} />
     </ChildLayout>
   );
 }

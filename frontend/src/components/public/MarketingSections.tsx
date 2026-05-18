@@ -45,7 +45,7 @@ function MascotIllustration() {
           </div>
 
           {/* Sweet Smile */}
-          <div className="mt-4 h-4 w-10 border-b-4 border-slate-800 rounded-full animate-bounce-gentle" />
+          <div className="mt-4 h-4 w-10 border-b-4 border-slate-850 rounded-full animate-bounce-gentle" />
 
           {/* Mascot Ears */}
           <div className="absolute -left-3 top-10 h-12 w-8 rounded-l-full bg-emerald-100 border-l-4 border-emerald-400" />
@@ -72,9 +72,10 @@ export function Hero() {
           <span>Dành Cho Phụ Huynh & Thiết Bị Gia Đình</span>
         </div>
         
-        <h1 className="max-w-4xl text-5xl font-black leading-[1.05] tracking-tight text-slate-800 sm:text-6xl md:text-7xl">
+        {/* Fixed dot-clipping by increasing leading to leading-[1.12] and adding py-3 px-1 on the clipped span */}
+        <h1 className="max-w-4xl text-5xl font-black leading-[1.12] tracking-tight text-slate-855 sm:text-6xl md:text-7xl">
           Biến thời gian màn hình thành
-          <span className="block mt-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 bg-clip-text text-transparent">
+          <span className="block mt-2 py-3 px-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 bg-clip-text text-transparent">
             Học tập, Đọc sách & Vận động
           </span>
         </h1>
@@ -92,9 +93,9 @@ export function Hero() {
           </Link>
           <Link
             className="bubbly-btn rounded-2xl bg-gradient-to-r from-blue-400 to-indigo-400 px-8 py-5 text-center text-sm font-black text-white shadow-xl shadow-blue-100 hover:shadow-blue-200"
-            href="/features"
+            href="/auth/register"
           >
-            Khám phá tính năng
+            Đăng ký ngay!
           </Link>
         </div>
       </div>
@@ -157,6 +158,73 @@ export function FeatureGrid() {
   );
 }
 
+// "Tại sao chọn chúng tôi" Section (New & Highly Professional)
+export function WhyChooseUs() {
+  const advantages = [
+    {
+      icon: "🧠",
+      title: "Phát triển trí thông minh vượt bậc",
+      desc: "Thông qua các nhiệm vụ giải đố logic, toán tư duy và khoa học được cấu trúc hóa theo phương pháp vừa chơi vừa học. Trẻ tự lập rèn luyện trí tuệ mà không hề cảm thấy áp lực hay gò bó.",
+      bgColor: "bg-indigo-50/70 border-indigo-150",
+      textColor: "text-indigo-600"
+    },
+    {
+      icon: "📚",
+      title: "Nuôi dưỡng thói quen tự đọc sách",
+      desc: "Trẻ có động lực đọc các cuốn truyện bổ ích và sách khoa học được duyệt trước để tích lũy điểm thưởng. Kích thích khả năng tập trung sâu thay vì xu hướng lướt video ngắn xao nhãng.",
+      bgColor: "bg-blue-50/70 border-blue-150",
+      textColor: "text-blue-600"
+    },
+    {
+      icon: "🏃",
+      title: "Rèn luyện thể chất & sức khỏe dẻo dai",
+      desc: "Các thử thách thể lực lành mạnh như nhảy lò cò, đứng tấn hoặc nhảy dây đòi hỏi trẻ vận động thực tế, giúp con giữ đôi mắt khỏe mạnh và tránh xa lối sống thụ động dính liền màn hình.",
+      bgColor: "bg-emerald-50/70 border-emerald-150",
+      textColor: "text-emerald-600"
+    },
+    {
+      icon: "🛡️",
+      title: "Kiến tạo kỷ luật tự giác & Kỹ năng sống",
+      desc: "Khuyến khích con giúp đỡ cha mẹ việc nhà như tự gấp quần áo, dọn phòng, quét nhà. Trẻ thấu hiểu giá trị của sự nỗ lực chân chính để nhận lại các giờ giải trí giới hạn an toàn.",
+      bgColor: "bg-amber-50/70 border-amber-150",
+      textColor: "text-amber-600"
+    }
+  ];
+
+  return (
+    <section className="mt-20">
+      <div className="text-center max-w-3xl mx-auto mb-12">
+        <span className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+          Giá Trị Độc Bản
+        </span>
+        <h2 className="text-3xl font-black text-slate-800 tracking-tight mt-3 sm:text-4xl">
+          Tại sao cha mẹ thông thái chọn Kindy-Mate?
+        </h2>
+        <p className="mt-3 text-slate-500 font-semibold leading-relaxed">
+          Chúng tôi không chỉ giới hạn thời gian sử dụng thiết bị – Chúng tôi chuyển hóa thói quen thụ động thành động lực tăng trưởng toàn diện cho tương lai của con.
+        </p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {advantages.map((adv) => (
+          <div 
+            className={`interactive-card rounded-[2.5rem] border ${adv.bgColor} p-6 md:p-8 flex gap-5 items-start`}
+            key={adv.title}
+          >
+            <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white shadow-md text-2xl ${adv.textColor} animate-float-slow`}>
+              {adv.icon}
+            </span>
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-slate-800 leading-tight">{adv.title}</h3>
+              <p className="text-xs font-bold leading-relaxed text-slate-550">{adv.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function ChildJourney() {
   const steps = [
     { num: "1", label: "Chọn nhiệm vụ", desc: "Đọc sách, Toán học, Squats..." },
@@ -166,7 +234,7 @@ export function ChildJourney() {
   ];
 
   return (
-    <section className="mt-16 rounded-[2.5rem] bg-gradient-to-br from-teal-400/10 via-emerald-400/5 to-transparent p-8 sm:p-12 border border-emerald-100">
+    <section className="mt-20 rounded-[2.5rem] bg-gradient-to-br from-teal-400/10 via-emerald-400/5 to-transparent p-8 sm:p-12 border border-emerald-100">
       <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
         <div className="space-y-4">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">Luồng Trải Nghiệm Của Trẻ</p>
@@ -193,6 +261,85 @@ export function ChildJourney() {
             </div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+// "Các phụ huynh khác nói gì" Section (New with Beautiful Review Cards)
+export function ParentReviews() {
+  const reviews = [
+    {
+      avatar: "👩‍🦰",
+      name: "Chị Lan",
+      location: "Hà Nội",
+      rating: 5,
+      content: "Con tôi từ khi dùng app đã hoàn toàn hết nghiện Tiktok. Thay vì lướt vô định hàng giờ, bé chủ động xin mẹ dọn nhà và squats thể dục để tích điểm đổi 15 phút xem hoạt hình tiếng Anh. App vô cùng thực tế và hiệu quả cho các mẹ bận rộn!"
+    },
+    {
+      avatar: "👨",
+      name: "Anh Dũng",
+      location: "TP. Hồ Chí Minh",
+      rating: 5,
+      content: "Thay vì cho con xem các con thú vật Brainrot vô ích và đầy bạo lực trên các mạng xã hội khác, tôi cài đặt Kindy-Mate. Con học được rất nhiều kiến thức khoa học, địa lý thực tế mà gia đình lại cực kỳ an tâm."
+    },
+    {
+      avatar: "👩",
+      name: "Chị Mai Anh",
+      location: "Đà Nẵng",
+      rating: 5,
+      content: "Điểm tôi ưng ý nhất là app KHÔNG có gacha hay hộp quà may rủi kích thích ham muốn giải trí của trẻ. Con hiểu được làm việc tốt mới có điểm thưởng. Một môi trường số quá văn minh và nhân văn!"
+    }
+  ];
+
+  return (
+    <section className="mt-20 pb-8">
+      <div className="text-center max-w-3xl mx-auto mb-12">
+        <span className="text-xs font-black uppercase tracking-[0.2em] text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+          Đánh Giá Thực Tế
+        </span>
+        <h2 className="text-3xl font-black text-slate-800 tracking-tight mt-3 sm:text-4xl">
+          Các phụ huynh khác nói gì về chúng tôi?
+        </h2>
+        <p className="mt-3 text-slate-500 font-semibold leading-relaxed">
+          Hàng ngàn gia đình đã thay đổi cuộc sống số của con trở nên lành mạnh, năng động hơn mỗi ngày.
+        </p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {reviews.map((rev) => (
+          <div 
+            className="interactive-card rounded-[2.5rem] bg-white border border-slate-150 p-6 md:p-8 flex flex-col justify-between shadow-sm relative overflow-hidden"
+            key={rev.name}
+          >
+            {/* Quote background deco */}
+            <div className="absolute right-6 top-6 text-6xl text-slate-100/80 font-serif select-none pointer-events-none">
+              “
+            </div>
+
+            <div>
+              {/* Stars rating */}
+              <div className="flex gap-1 mb-4 text-amber-400">
+                {Array.from({ length: rev.rating }).map((_, i) => (
+                  <span key={i}>★</span>
+                ))}
+              </div>
+              <p className="text-xs font-bold leading-relaxed text-slate-550 italic mb-6">
+                &ldquo;{rev.content}&rdquo;
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 border-t border-slate-50 pt-4 mt-auto">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-xl">
+                {rev.avatar}
+              </span>
+              <div>
+                <h4 className="text-sm font-black text-slate-800">{rev.name}</h4>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide">{rev.location}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

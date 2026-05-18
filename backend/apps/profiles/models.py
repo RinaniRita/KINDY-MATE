@@ -10,6 +10,7 @@ class ChildProfile(models.Model):
     age = models.PositiveSmallIntegerField()
     avatar_id = models.CharField(max_length=40, default='milo')
     interests = models.CharField(max_length=255, blank=True)
+    favorite_subjects = models.CharField(max_length=255, blank=True, default='')
     default_language = models.CharField(max_length=8, default='vi')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

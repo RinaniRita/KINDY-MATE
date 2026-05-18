@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import RegisterSerializer, UserSerializer
+from .serializers import RegisterSerializer, UserProfileSerializer, UserSerializer
 
 
 def token_payload(user):
@@ -40,7 +40,7 @@ class LoginView(APIView):
                 user = authenticate(request, username=matched_user.username, password=password)
         if user is None:
             return Response(
-                {'detail': 'Invalid username or password.'},
+                {'detail': 'Tên đăng nhập hoặc mật khẩu chưa đúng.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(token_payload(user))
@@ -49,3 +49,9 @@ class LoginView(APIView):
 class MeView(APIView):
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(UserSerializer(user).data)
