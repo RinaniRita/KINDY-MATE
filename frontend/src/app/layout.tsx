@@ -8,8 +8,9 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Kindy-Mate | AI Companion for Kids",
-  description: "An AI-powered learning and safety companion for kindergarteners.",
+  title: "Kindy-Mate | Chuyển đổi thời gian màn hình",
+  description:
+    "Ứng dụng giúp phụ huynh chuyển thời gian màn hình thụ động thành học tập, đọc, vận động và giải trí lành mạnh có giới hạn.",
 };
 
 export default function RootLayout({
@@ -18,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body className={`${nunito.variable} antialiased`}>
         {children}
       </body>

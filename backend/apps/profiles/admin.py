@@ -1,3 +1,5 @@
 from django.contrib import admin
+from .models import ChildProfile, ParentRule
 
-# Register your models here.
+admin.site.register(ChildProfile)
+admin.site.register(ParentRule)

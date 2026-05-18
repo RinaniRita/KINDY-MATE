@@ -1,0 +1,1248 @@
+# AGENTS.md — Kindy-Mate AI
+
+## 1. Project Overview
+
+Kindy-Mate AI is a parent-led, AI-supported child development platform designed to convert children’s existing passive screen time into structured learning, reading, movement, creative tasks, and limited healthy entertainment.
+
+The app is not a generic learning app, not a free-chat AI companion, not a simple parental control tool, and not an entertainment platform. Its core purpose is to help parents guide children’s free time on digital devices in a safer, more purposeful, and development-oriented way.
+
+The product is built around a child-safe reward economy:
+
+- Children earn points by completing beneficial activities.
+- Children spend points on limited healthy entertainment or mascot customization.
+- Parents configure the boundaries, caps, allowed content, and AI permissions.
+- AI supports personalization, mission generation, learning feedback, movement verification, speech support, and parent-facing analytics.
+
+The project is aligned mainly with:
+
+- SDG 4: Quality Education
+- SDG 3: Good Health and Well-being
+- Potentially SDG 10: Reduced Inequalities, but only cautiously and without overclaiming
+
+The central product thesis is:
+
+> Kindy-Mate does not aim to increase children’s screen time. It aims to convert existing passive screen time into structured learning, reading, movement, and healthy entertainment through an AI-supported, parent-supervised reward system.
+
+## 2. Core Product Positioning
+
+Always describe Kindy-Mate as:
+
+> A parent-led, AI-supported screen-time conversion system for children.
+
+Do not describe it as:
+
+- An AI babysitter
+- A chatbot friend for children
+- A free-chat companion
+- A normal educational app
+- A game app
+- A platform that encourages children to own personal smartphones
+- A replacement for parents, teachers, doctors, therapists, or real-world relationships
+
+Correct positioning:
+
+> Kindy-Mate helps parents turn children’s existing free screen time into structured development time by combining AI-personalized missions, a safe reward economy, healthy content, mascot customization, and parent-controlled dashboards.
+
+## 3. Target Users
+
+There are two primary user groups:
+
+### 3.1 Parent / Guardian
+
+The parent is the primary account owner and final decision-maker.
+
+Parents can:
+
+- Create and manage child profiles
+- Set daily entertainment caps
+- Set allowed time windows
+- Choose allowed content categories
+- Approve or block content
+- Configure point conversion rules
+- Enable or disable voice features
+- Enable or disable camera-based movement verification
+- View reports and insights
+- Override or pause the system
+- Receive alerts when usage becomes unbalanced
+
+### 3.2 Child
+
+The child is the active participant but not the system owner.
+
+Children can:
+
+- Complete learning, reading, movement, creative, and reflection missions
+- Earn reward points
+- Spend points on limited entertainment or mascot customization
+- View simple progress feedback
+- Interact with the mascot only within guided, pre-defined flows
+
+Children must not be given unrestricted access to settings, content controls, AI free-chat, raw data, or parent dashboards.
+
+## 4. Parent-Led Design Principle
+
+Kindy-Mate must always be designed as parent-led.
+
+This means:
+
+- Parent onboarding must happen before child access.
+- Children cannot create accounts independently.
+- Parents create the child profile.
+- Parents control the daily cap and content categories.
+- Parents approve sensitive permissions such as microphone and camera.
+- Parents can disable entertainment, mascot customization, voice recognition, or movement verification.
+- Parent settings override child-earned points.
+
+Important rule:
+
+> Points never override parent controls.
+
+If a child has many points but the daily entertainment cap has already been reached, entertainment remains locked.
+
+## 5. Device Ownership Assumption
+
+Do not design the app around the assumption that children should own personal smartphones.
+
+Kindy-Mate should be framed as an app for supervised use on:
+
+- Parent-owned devices
+- Shared family tablets
+- Shared family phones
+- School or supervised learning devices in future versions
+
+Correct wording:
+
+> Kindy-Mate does not advocate giving children personal smartphones. It is designed for supervised use on parent-owned or shared family devices during limited free-time periods.
+
+## 6. Core User Loop
+
+The main child-facing loop is:
+
+1. Child opens the app.
+2. Mascot greets the child within a safe scripted interaction.
+3. App checks available points, daily caps, and parent rules.
+4. If the child wants entertainment/customization but lacks points or has reached the cap, the app suggests Growth Missions.
+5. Child completes a mission.
+6. AI or rule-based logic verifies the mission.
+7. Child earns points.
+8. Child spends points on limited healthy entertainment or mascot customization, if parent rules allow.
+9. Parent dashboard updates.
+10. AI analytics recommends future mission adjustments.
+
+The core behavior loop:
+
+> Useful activity → earn points → spend points within limits → parent insight → adaptive mission planning.
+
+## 7. Growth Missions
+
+Growth Missions are short, beneficial activities that children complete to earn points.
+
+Mission types:
+
+### 7.1 Learning Missions
+
+Examples:
+
+- Age-appropriate math questions
+- Vocabulary practice
+- Logic puzzles
+- Science facts
+- Short quizzes
+- Simple problem-solving tasks
+
+### 7.2 Reading Missions
+
+Examples:
+
+- Read a short story
+- Answer comprehension questions
+- Read aloud
+- Identify main idea
+- Retell a story in simple words
+- Choose a recommended book
+
+### 7.3 Movement Missions
+
+Examples:
+
+- 10 jumping jacks
+- 10 light squats
+- Arm circles
+- Toe touches
+- Stretching
+- Balance pose
+- Short dance movement
+- Step left/right movement
+
+Movement missions must be low-risk, equipment-free, short, and age-appropriate.
+
+### 7.4 Creative Missions
+
+Examples:
+
+- Draw something related to a story
+- Create a short story ending
+- Describe an imaginary character
+- Build a simple idea map
+- Choose colors for a scene
+
+### 7.5 Light Reflection Missions
+
+Reflection must be safe and limited. It should not become emotional counseling.
+
+Allowed reflection examples:
+
+- “What did you learn today?”
+- “Which mission felt easiest?”
+- “Which mission do you want to try next: reading, movement, or drawing?”
+- “What is one new word you remember?”
+
+Avoid reflection prompts about:
+
+- Deep emotional distress
+- Family conflict
+- Personal secrets
+- Trauma
+- Mental health diagnosis
+- Self-harm
+- Medical issues
+- Sensitive identity issues
+
+If such topics arise, the system should stop the AI interaction and direct the child to talk to a trusted adult or notify the parent depending on severity.
+
+## 8. Reward Economy
+
+The reward economy must be transparent, limited, and child-safe.
+
+Children earn points by completing beneficial missions.
+
+Children spend points on:
+
+- Limited healthy entertainment
+- Low-stimulation games
+- Educational clips
+- Documentary clips
+- Mascot clothing
+- Mascot accessories
+- Mascot backgrounds
+- Mascot rooms
+- Superhero outfits
+- Animal costumes
+- Adventure items
+
+The purpose of points is not to maximize playtime. Points are a structured feedback mechanism that helps children understand balance between effort, learning, movement, and limited entertainment.
+
+## 9. Reward Economy Safety Rules
+
+The reward system must avoid dark patterns.
+
+Never implement:
+
+- Loot boxes
+- Gacha systems
+- Random paid rewards
+- Gambling-like mechanics
+- Real-money purchase of points for children
+- Streak pressure that punishes missed days
+- “Mascot is sad because you left” mechanics
+- Infinite point farming
+- Infinite scrolling rewards
+- Confusing currency systems
+- Time-limited pressure offers
+- Push notifications that emotionally manipulate children
+- Ads targeted at children
+
+Required controls:
+
+- Daily entertainment cap
+- Parent-defined point conversion rate
+- Parent override
+- Cooldown after entertainment sessions
+- Diminishing returns for repeated mission farming
+- Balanced mission requirements
+- No entertainment beyond parent-set cap
+- No conversion of points into real money
+- No child-facing in-app purchase flow
+
+## 10. Anti-Abuse Rules
+
+Children must not be able to exploit the system by repeatedly doing the easiest task to unlock unlimited entertainment.
+
+Implement or plan these safeguards:
+
+### 10.1 Daily Entertainment Cap
+
+Even if a child has enough points, entertainment cannot exceed the parent-defined daily limit.
+
+### 10.2 Diminishing Returns
+
+Repeated completion of the same task type should provide fewer points over time.
+
+Example:
+
+- First squat mission: full reward
+- Second repeated squat mission: reduced reward
+- Third repeated squat mission: further reduced reward
+- Then app recommends another category such as reading or learning
+
+### 10.3 Balanced Mission Requirement
+
+Longer entertainment access should require a balanced set of missions.
+
+Example:
+
+- Reading or learning mission required before entertainment
+- Movement mission can support health balance but cannot alone unlock large amounts of entertainment repeatedly
+
+### 10.4 Cooldown
+
+After an entertainment session, the app should require a break before another entertainment session.
+
+### 10.5 Parent Override
+
+Parents can pause, reduce, or disable entertainment if the child abuses the reward loop.
+
+## 11. Mascot Design
+
+The mascot is a guided interface and motivational layer, not a sentient friend.
+
+The mascot can:
+
+- Welcome the child
+- Explain missions
+- Give short feedback
+- Celebrate effort
+- Suggest next missions
+- Show progress visually
+- Guide safe app navigation
+
+The mascot must not:
+
+- Claim to be human
+- Claim to have real feelings
+- Say it is lonely, sad, scared, or dependent on the child
+- Ask the child for secrets
+- Ask for address, school name, phone number, photos, or identifying data
+- Give medical, psychological, legal, or sensitive advice
+- Encourage the child to hide things from parents
+- Encourage more screen time beyond parent limits
+- Create emotional dependency
+- Use guilt, fear, sadness, or pressure to keep the child in the app
+
+Preferred mascot language:
+
+- “Great effort. You completed the reading mission.”
+- “The next mission is 10 light squats.”
+- “You earned 5 movement points.”
+- “You have reached today’s entertainment limit. Let’s stop here and come back tomorrow.”
+- “Ask your parent if you want to change this setting.”
+
+Avoid mascot language:
+
+- “I am sad when you leave.”
+- “Please do not leave me.”
+- “I need you.”
+- “I will lose energy if you stop.”
+- “You must play with me.”
+- “Do not tell your parents.”
+
+## 12. AI Interaction Scope
+
+Kindy-Mate must not provide free-form chatbot interaction for children.
+
+Use guided AI interaction only.
+
+Allowed AI interactions:
+
+- Mission instructions
+- Age-appropriate explanations
+- Quiz generation from curated content
+- Reading comprehension feedback
+- Movement confirmation feedback
+- Simple learning feedback
+- Mission recommendation
+- Parent-facing summary generation
+
+Disallowed AI interactions:
+
+- Open-ended emotional companionship
+- Deep personal conversations
+- Unbounded Q&A about any topic
+- Medical advice
+- Mental health advice
+- Legal advice
+- Relationship advice
+- Political persuasion
+- Religious persuasion
+- Adult topics
+- Violent, sexual, or unsafe content
+- Requests for personal identifiable information
+
+If the child asks an out-of-scope question, the AI should respond briefly and safely, then redirect to a parent or an appropriate mission.
+
+Example safe response:
+
+> “I can help with learning, reading, movement, and app missions. Please ask your parent about that question.”
+
+## 13. AI Architecture Philosophy
+
+Use a curated content-first architecture.
+
+Important principle:
+
+> AI should not freely invent core educational content for children from nothing.
+
+Instead:
+
+1. Store trusted learning, reading, movement, and entertainment content in a curated content bank.
+2. Let AI select, adapt, simplify, explain, and quiz based on that content.
+3. Use guardrails and moderation before showing output to children.
+4. Parent settings constrain what AI can show.
+
+Correct architecture:
+
+> Curated content bank → AI selection/adaptation → safety filter → child interaction → parent dashboard.
+
+Avoid architecture:
+
+> Child asks anything → LLM freely answers anything.
+
+## 14. LLM Scope
+
+For demo/MVP, the LLM may be used for:
+
+- Mission generation from predefined templates
+- Rewriting instructions in child-friendly language
+- Generating quiz questions from approved content
+- Explaining simple concepts from approved content
+- Giving short feedback
+- Summarizing weekly progress for parents
+
+For production/future plan:
+
+- Use stronger child-safety guardrails
+- Use RAG over approved content only
+- Use moderation before and after generation
+- Consider smaller/local/private models where feasible
+- Maintain audit logs for parent-facing explanations without storing sensitive child conversations unnecessarily
+
+Do not use LLM for:
+
+- Free chatting with children
+- Sensitive advice
+- Emotionally manipulative companionship
+- Unverified factual claims
+- Long unsupervised conversations
+
+## 15. Suggested LLM Options
+
+For demo:
+
+- OpenAI GPT model via API
+- Google Gemini API
+- Anthropic Claude API
+- Local/open-source model such as Llama, Mistral, or Qwen through Ollama or Hugging Face
+
+Recommended demo strategy:
+
+- Use a reliable cloud LLM for smooth demo if privacy constraints are explained clearly.
+- Make clear that production should move toward stronger privacy, local/private inference, or child-safe controlled deployment.
+
+Future production strategy:
+
+- RAG over curated content
+- Strict system prompts
+- Moderation layer
+- Parent-configured boundaries
+- No free-chat mode
+- Optional local inference
+
+## 16. Speech Recognition Scope
+
+Speech recognition supports reading-aloud and speaking missions.
+
+Allowed use cases:
+
+- Detect whether the child read a short sentence or passage
+- Convert speech to text for basic reading checks
+- Support pronunciation practice lightly
+- Let child answer simple questions by voice
+
+Do not claim:
+
+- Clinical speech diagnosis
+- Perfect pronunciation assessment
+- Language disorder detection
+- Psychological analysis from voice
+
+Potential demo options:
+
+- Browser Web Speech API
+- OpenAI Whisper API
+- Whisper Tiny/Base
+- whisper.cpp for local inference
+
+Production direction:
+
+- Prefer on-device processing where feasible
+- Do not upload or store raw child audio by default
+- Store only minimal derived data, such as completion status or basic score
+- Parent must explicitly enable microphone features
+- Provide non-voice alternative tasks
+
+## 17. Computer Vision Scope
+
+Computer vision supports simple movement verification.
+
+Allowed use cases:
+
+- Count simple exercises
+- Confirm basic movement completion
+- Detect body keypoints for low-risk exercises
+
+Do not claim:
+
+- Medical posture assessment
+- Fitness diagnosis
+- Injury detection
+- Professional coaching accuracy
+- Health scoring based on body image
+
+Potential demo option:
+
+- MediaPipe Pose Landmarker / BlazePose
+
+Movement verification should be rule-based in MVP:
+
+- Squat: use knee/hip angle threshold
+- Jumping jack: use hand and ankle distance changes
+- Stretch: use arm position or body angle
+
+Production direction:
+
+- On-device pose estimation
+- Do not store raw video by default
+- Store only completion result or rep count
+- Parent must explicitly enable camera features
+- Provide non-camera alternatives
+
+## 18. AI Analytics Scope
+
+AI analytics should support parents, not diagnose children.
+
+Allowed analytics:
+
+- Learning time
+- Reading time
+- Movement time
+- Entertainment time
+- Points earned
+- Points spent
+- Mission completion rate
+- Content category balance
+- Repeated task patterns
+- Passive entertainment ratio
+- Weekly progress summary
+- Parent-facing recommendations
+
+Disallowed analytics:
+
+- Mental health diagnosis
+- Medical diagnosis
+- Personality diagnosis
+- Intelligence scoring without validation
+- Labeling the child as lazy, addicted, unhealthy, or abnormal
+
+Preferred wording:
+
+> The system identifies usage patterns and suggests parent-controlled adjustments.
+
+Avoid wording:
+
+> The system diagnoses screen addiction or mental health problems.
+
+## 19. Content Scope Overview
+
+Content is the intervention. AI is only the personalization and safety layer.
+
+Kindy-Mate requires curated content in these categories:
+
+- Learning content
+- Reading content
+- Movement content
+- Creative content
+- Healthy entertainment
+- Educational documentaries / short learning videos
+- Parent-approved external content
+
+AI must not replace content governance.
+
+## 20. Learning Content Sources
+
+For demo, use internally created sample content inspired by trusted educational frameworks.
+
+Potential research/benchmark sources:
+
+- Khan Academy Kids
+- Khan Academy
+- PBS LearningMedia
+- CK-12
+- ReadWorks
+- StoryWeaver
+- British Council LearnEnglish Kids
+- Oxford Owl
+- Common Core-aligned worksheets
+- National curriculum materials depending on target market
+
+Important:
+
+- Do not copy copyrighted content directly unless license permits.
+- Use trusted sources for benchmarking, content structure, difficulty levels, and educational design.
+- For production, use licensed content, open educational resources, or internally authored content reviewed by educators.
+
+## 21. Reading Content Sources
+
+Reading content should be:
+
+- Age-appropriate
+- Short enough for mission format
+- Comprehension-friendly
+- Culturally appropriate
+- Non-violent
+- Non-manipulative
+- Available under suitable license if used directly
+
+Potential sources to research:
+
+- StoryWeaver
+- Oxford Owl
+- Project Gutenberg for public domain content, with careful age adaptation
+- British Council LearnEnglish Kids
+- ReadWorks
+- Public library reading lists
+- Internally written stories reviewed by educators
+
+AI can:
+
+- Generate comprehension questions from approved reading content
+- Simplify vocabulary
+- Suggest related books
+- Ask the child to retell the story
+
+AI must not:
+
+- Generate unreviewed long stories on sensitive topics
+- Insert unsafe or age-inappropriate content
+- Replace educator-reviewed material for core learning
+
+## 22. Movement Content Sources
+
+Movement missions should be based on public health guidance and child-safe activity principles.
+
+Potential sources to research:
+
+- WHO physical activity guidelines
+- CDC physical activity recommendations
+- NHS physical activity guidance
+- Australian physical activity guidelines
+- Canadian 24-Hour Movement Guidelines
+- Classroom movement break research
+
+Movement tasks must be:
+
+- Short
+- Safe
+- Equipment-free
+- Low-risk
+- Age-appropriate
+- Space-efficient
+- Optional if parent disables camera/CV
+
+Avoid:
+
+- High-intensity excessive challenges
+- Long planks
+- Burpees for young children
+- Heavy jumping in unsafe indoor spaces
+- Weightlifting
+- Competitive body-image framing
+- Any task that could cause shame or injury
+
+## 23. Entertainment Content Sources
+
+Entertainment must be healthy, limited, and parent-approved.
+
+Potential sources to research/benchmark:
+
+- PBS Kids
+- Sesame Workshop / Sesame Street
+- BBC CBeebies / BBC Teach
+- National Geographic Kids
+- NASA educational videos
+- TED-Ed for older children
+- Smithsonian Learning Lab
+- Common Sense Media ratings for evaluating age appropriateness
+
+Important:
+
+- Check license before embedding or storing any third-party video.
+- Avoid uncontrolled YouTube feeds.
+- If using YouTube embeds for demo, use official channels only, whitelist specific videos, disable autoplay where possible, and clearly state that production requires licensing or approved content partnerships.
+- Do not use TikTok/Reels/Shorts-style feeds.
+
+Entertainment must not include:
+
+- Infinite scrolling
+- Autoplay chains
+- Ads targeting children
+- Loot-box games
+- Shock/prank content
+- Violent content
+- Overstimulating rapid-cut videos
+- Unreviewed influencer content
+
+## 24. Documentary / Educational Video Content
+
+Short documentary or educational clips should be:
+
+- Age-rated
+- Short
+- Factually reliable
+- Calmly paced
+- Connected to learning missions
+- Parent-approved
+- Rights-compliant
+
+Potential sources to research:
+
+- PBS LearningMedia
+- NASA education resources
+- National Geographic Kids
+- Smithsonian Learning Lab
+- BBC Teach
+- TED-Ed for older children
+
+Use case:
+
+- Child watches a short documentary clip after earning points.
+- AI asks 2–3 comprehension questions.
+- Parent dashboard records this as educational entertainment, not passive entertainment, if the child completes the reflection/quiz.
+
+## 25. Content Governance Framework
+
+Every piece of content must be reviewed or filtered according to these criteria:
+
+1. Age appropriateness
+2. Educational/developmental value
+3. Low stimulation level
+4. No harmful language
+5. No violence or fear-based content for young children
+6. No sexual content
+7. No manipulative ads
+8. No infinite autoplay
+9. No loot-box or gambling-like mechanics
+10. Parent approval or trusted whitelist
+11. Clear license or permission for use
+12. Cultural sensitivity
+13. Ability to support active engagement, not only passive viewing
+
+## 26. Content Metadata Requirements
+
+Each content item should include metadata:
+
+- content_id
+- title
+- content_type: learning, reading, movement, creative, entertainment, documentary
+- age_min
+- age_max
+- difficulty_level
+- estimated_duration_minutes
+- stimulation_level: low, medium, high
+- requires_audio: true/false
+- requires_camera: true/false
+- requires_parent_approval: true/false
+- source_name
+- source_url_or_reference
+- license_status
+- learning_objective
+- related_sdg: SDG3, SDG4, SDG10 optional
+- points_reward_or_cost
+- cooldown_category
+- safety_notes
+
+Do not serve content without minimum metadata.
+
+## 27. Parent Dashboard Requirements
+
+Parent dashboard should include:
+
+- Total app time
+- Active learning time
+- Reading time
+- Movement time
+- Entertainment time
+- Documentary/educational video time
+- Points earned
+- Points spent
+- Mission completion rate
+- Repeated mission patterns
+- Entertainment cap status
+- Usage by time of day
+- AI-generated weekly summary
+- Recommended adjustments
+- Content approval queue
+- Voice/camera permission toggles
+- Emergency pause / kill switch
+
+The dashboard should focus on developmental balance, not invasive surveillance.
+
+Avoid showing overly invasive details unless necessary.
+
+## 28. Parent Alerts
+
+Parent alerts may include:
+
+- Entertainment cap reached
+- Repeated attempts to unlock entertainment
+- High passive entertainment ratio
+- Low movement activity over several days
+- Reading missions repeatedly skipped
+- Attempted out-of-scope AI conversation
+- Camera/microphone permission request
+- New content approval required
+- Bedtime usage attempt
+
+Alerts should be informative, not alarmist.
+
+Avoid language like:
+
+- “Your child is addicted”
+- “Your child is unhealthy”
+- “Your child failed”
+
+Use language like:
+
+- “Entertainment time reached today’s limit.”
+- “Reading missions were skipped three times this week.”
+- “Consider setting a shorter entertainment window before bedtime.”
+
+## 29. Privacy and Data Protection
+
+Because the app targets children, privacy must be strict.
+
+Core rules:
+
+- Parent consent required before child use.
+- Collect minimum data only.
+- Use nickname/avatar instead of real name/photo by default.
+- Do not ask for child address, school, phone number, or identifying details.
+- Voice and camera features must be optional.
+- Prefer on-device processing for audio/video.
+- Do not upload raw audio/video by default.
+- Do not sell child data.
+- Do not show targeted ads.
+- Do not create public child profiles.
+- Parent can delete child data.
+- Parent can export or review stored data.
+- Store only what is necessary for mission progress and parental insight.
+
+Sensitive data includes:
+
+- Voice
+- Face/body video
+- Age
+- Behavioral patterns
+- Learning performance
+- Usage history
+- Emotional responses
+
+Handle all such data carefully.
+
+## 30. Safety and Moderation
+
+The system should include:
+
+- Input moderation
+- Output moderation
+- Topic restrictions
+- PII detection
+- Parent escalation
+- Content whitelist
+- Age-based filtering
+- Blocked topics list
+- Safe fallback responses
+
+If AI is uncertain, it should not improvise freely. It should respond safely and redirect.
+
+Example:
+
+> “I cannot help with that. Please ask your parent. Let’s return to your reading mission.”
+
+## 31. MVP Scope
+
+MVP should be feasible and demo-friendly.
+
+Must-have MVP features:
+
+- Parent account setup
+- Child profile with age and nickname
+- Parent-set daily entertainment cap
+- Curated content bank
+- AI mission generator using predefined templates
+- Basic reading/learning missions
+- Basic movement missions
+- Points earned from missions
+- Points spent on entertainment/customization
+- Mascot UI with guided interactions
+- Parent dashboard summary
+- No free-chat mode
+- Basic safety filter
+- Content whitelist
+
+Nice-to-have MVP features:
+
+- Speech recognition for reading aloud
+- MediaPipe movement verification
+- Mascot clothing customization
+- Weekly AI summary for parents
+- Cooldown timer
+- Diminishing returns
+
+Future features:
+
+- On-device speech recognition
+- On-device CV
+- RAG over curated content
+- Licensed content partnerships
+- More advanced adaptive learning
+- Multi-child family dashboard
+- School/teacher mode
+- Offline mode
+- Vietnamese-English bilingual content
+- Accessibility features
+
+## 32. Technical Architecture Suggestion
+
+Suggested demo architecture:
+
+- Frontend: React, Next.js, or Flutter
+- Backend: FastAPI, Flask, Node.js, or Firebase Functions
+- Database: Firebase, Supabase, PostgreSQL, or SQLite for prototype
+- LLM: OpenAI/Gemini/Claude API or local model via Ollama
+- Speech: Web Speech API, Whisper API, Whisper Tiny/Base, or whisper.cpp
+- CV: MediaPipe Pose Landmarker
+- Content bank: JSON, Firestore, Supabase table, or PostgreSQL table
+- Dashboard: chart components with simple analytics
+- Authentication: parent account + child profile + PIN protected parent area
+
+Keep the demo simple. Do not overbuild.
+
+## 33. Data Model Suggestions
+
+Possible entities:
+
+### UserParent
+
+- parent_id
+- email
+- password_hash or auth_provider
+- consent_status
+- created_at
+
+### ChildProfile
+
+- child_id
+- parent_id
+- nickname
+- age
+- avatar_id
+- interests
+- daily_entertainment_cap_minutes
+- allowed_content_categories
+- voice_enabled
+- camera_enabled
+- created_at
+
+### Mission
+
+- mission_id
+- mission_type
+- title
+- description
+- age_min
+- age_max
+- difficulty
+- estimated_duration
+- points_reward
+- source_content_id
+- requires_voice
+- requires_camera
+
+### MissionAttempt
+
+- attempt_id
+- child_id
+- mission_id
+- status
+- score
+- points_awarded
+- started_at
+- completed_at
+- verification_method
+
+### RewardWallet
+
+- child_id
+- points_balance
+- points_earned_total
+- points_spent_total
+
+### RewardTransaction
+
+- transaction_id
+- child_id
+- transaction_type: earn/spend/adjust
+- points_amount
+- reason
+- timestamp
+
+### ContentItem
+
+- content_id
+- title
+- content_type
+- age_min
+- age_max
+- difficulty
+- duration
+- stimulation_level
+- source
+- license_status
+- url_or_path
+- approval_status
+
+### ParentRule
+
+- rule_id
+- child_id
+- daily_cap
+- bedtime_lock_start
+- bedtime_lock_end
+- point_conversion_rate
+- allowed_categories
+- cooldown_minutes
+
+### UsageSession
+
+- session_id
+- child_id
+- session_type
+- started_at
+- ended_at
+- duration
+- content_id
+- points_spent
+
+## 34. UX Principles
+
+Child UI:
+
+- Simple
+- Calm
+- Colorful but not overstimulating
+- No infinite feeds
+- No aggressive notifications
+- No manipulative mascot emotion
+- Clear mission choices
+- Visual progress
+- Short interactions
+
+Parent UI:
+
+- Clear summaries
+- Simple settings
+- Explainable recommendations
+- Safety-first language
+- Fast override controls
+- No excessive surveillance tone
+
+## 35. Language and Tone
+
+For children:
+
+- Warm
+- Short
+- Clear
+- Encouraging
+- Effort-focused
+- Non-manipulative
+
+For parents:
+
+- Clear
+- Evidence-based
+- Practical
+- Not alarmist
+- No exaggerated medical claims
+
+Avoid:
+
+- “Your child is addicted”
+- “AI will fix your child’s brain”
+- “This app prevents all negative effects of screen time”
+- “The mascot is your child’s best friend”
+
+Use:
+
+- “supports healthier digital habits”
+- “helps structure screen time”
+- “encourages active learning and movement”
+- “provides parent-controlled insights”
+
+## 36. Claims to Avoid
+
+Do not claim:
+
+- The app cures screen addiction.
+- The app diagnoses mental health issues.
+- The app guarantees academic improvement.
+- The app replaces teachers.
+- The app replaces parents.
+- The app makes all screen time healthy.
+- The app can safely let children use phones independently.
+- The AI is always correct.
+- The AI understands children emotionally.
+- The mascot has real feelings.
+
+Preferred claim style:
+
+- “The app aims to support...”
+- “The system helps parents...”
+- “The design encourages...”
+- “The platform can reduce passive consumption by...”
+- “The MVP demonstrates...”
+
+## 37. SDG Alignment
+
+### SDG 4: Quality Education
+
+Kindy-Mate supports SDG 4 by:
+
+- Providing age-appropriate learning missions
+- Encouraging reading
+- Supporting literacy and numeracy activities
+- Personalizing learning difficulty
+- Turning passive screen time into active learning opportunities
+
+### SDG 3: Good Health and Well-being
+
+Kindy-Mate supports SDG 3 by:
+
+- Encouraging movement breaks
+- Reducing prolonged passive screen use
+- Supporting healthier digital routines
+- Allowing parent-set bedtime locks
+- Helping balance screen-based activity with physical activity
+
+### SDG 10: Reduced Inequalities
+
+Use cautiously.
+
+Kindy-Mate may support SDG 10 by:
+
+- Helping busy families access structured learning support
+- Offering low-cost educational guidance
+- Supporting families that lack time to curate content manually
+
+Do not overclaim that the app solves educational inequality.
+
+## 38. Competition Narrative
+
+The app should be presented as a sustainable development solution first, AI product second.
+
+Narrative flow:
+
+1. Problem: Children increasingly spend free time on passive, overstimulating digital content while parents lack time and tools to guide usage.
+2. Gap: Existing parental controls block content but do not provide meaningful alternatives; educational apps teach but do not manage entertainment behavior; entertainment apps maximize engagement rather than development.
+3. Solution: Kindy-Mate converts existing screen time into structured learning, reading, movement, and limited healthy entertainment through a parent-controlled reward system.
+4. AI role: AI personalizes missions, explains learning content, verifies movement/reading, and summarizes progress for parents.
+5. SDG impact: Supports quality education and child well-being by improving the quality and structure of children’s digital time.
+
+## 39. Demo Flow Recommendation
+
+A strong demo should show:
+
+1. Parent creates child profile.
+2. Parent sets daily entertainment cap and enables/disables AI features.
+3. Child opens app.
+4. Mascot offers mission choices.
+5. Child completes a reading or movement mission.
+6. Child earns points.
+7. Child spends points on short entertainment or mascot customization.
+8. App blocks additional entertainment after cap/cooldown.
+9. Parent dashboard shows learning/movement/entertainment balance.
+10. AI generates a parent-friendly recommendation.
+
+Do not demo free chatting with the mascot.
+
+## 40. Development Priorities
+
+Priority 1:
+
+- Parent control
+- Safe child profile
+- Mission system
+- Point economy
+- Content bank
+- Dashboard
+
+Priority 2:
+
+- Mascot customization
+- AI-generated mission adaptation
+- Basic analytics
+- Cooldown/diminishing returns
+
+Priority 3:
+
+- Speech recognition
+- Computer vision
+- Advanced recommendation
+- Licensed content integration
+
+Do not prioritize flashy mascot chat over safety and parent control.
+
+## 41. Implementation Warnings
+
+Be careful with:
+
+- Children’s privacy
+- Voice/camera data
+- Unreviewed AI outputs
+- Reward addiction loops
+- Emotional manipulation
+- Copyrighted content
+- Overclaiming health or education outcomes
+- Unbounded LLM chat
+- Lack of parent override
+- Unclear content licensing
+
+If unsure, choose the safer and more parent-controlled design.
+
+## 42. Final Product Principle
+
+Everything in Kindy-Mate should follow this principle:
+
+> AI is the personalization and safety layer. Content is the intervention. Parent control is the governance. SDG impact is the purpose.
+
+When making any product, design, code, or feature decision, ask:
+
+1. Does this support SDG 4 or SDG 3?
+2. Does this reduce passive, uncontrolled screen use?
+3. Does this help parents guide children better?
+4. Does this avoid manipulating children?
+5. Does this protect child privacy?
+6. Does this keep AI within safe and bounded roles?
+7. Does this improve the quality of screen time rather than increasing it?
+
+If the answer is no, reconsider the feature.

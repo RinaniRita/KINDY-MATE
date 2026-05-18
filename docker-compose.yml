@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
@@ -18,6 +16,51 @@ services:
     container_name: kindy_mate_redis
     ports:
       - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kindy_mate_backend
+    working_dir: /app/backend
+    command: >
+      sh -c "uv run manage.py migrate &&
+             uv run manage.py seed_demo &&
+             uv run manage.py runserver 0.0.0.0:8000"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - /app/backend/.venv
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kindy_mate_frontend
+    working_dir: /app/frontend
+    command: pnpm dev --hostname 0.0.0.0
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_ENV: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+      - /app/frontend/.next
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

@@ -1,3 +1,6 @@
 from django.contrib import admin
+from .models import ContentItem, Mission, MissionAttempt
 
-# Register your models here.
+admin.site.register(ContentItem)
+admin.site.register(Mission)
+admin.site.register(MissionAttempt)

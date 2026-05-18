@@ -1,50 +1,124 @@
-# Workspaces local environments
+# ==========================================
+# KINDY-MATE MONOREPO MASTER GITIGNORE
+# ==========================================
+
+# --- Local Environment & Secret Files ---
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env.*.local
+*.env
+! .env.example
 
-# Python / uv remnants
+# --- Python / Django Caches & Compiled Files ---
 __pycache__/
 *.py[cod]
-.venv/
-.uv/
-uv.lock
-
-# Frontend build outputs & dependencies
-node_modules/
-.next/
-out/
+*$py.class
+*.so
+.Python
 build/
-.pnpm-debug.log
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# OS specific
-.DS_Store
-Thumbs.db
+# --- Python Virtual Environments ---
+.venv/
+venv/
+ENV/
+env/
+.env/
+pip-log.txt
+pip-delete-this-directory.txt
 
-.agent/
-.claude/
+# --- Python Testing, Ruff & Coverage ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+cython_debug/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+pylintrc
+.tox/
+.nox/
 
-# IDE & Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Django Database & Media
+# --- Django Specific Outputs ---
 db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+static/collected/
+*.log
+local_settings.py
 
-# Next.js & Node additions
+# --- Node.js / Frontend Dependencies ---
+node_modules/
+/frontend/node_modules/
+jspm_packages/
+web_modules/
+
+# --- Next.js Build Outputs & Cache ---
+.next/
+/frontend/.next/
+out/
+dist/
+/frontend/out/
+/frontend/dist/
+.npm
+.eslintcache
 *.tsbuildinfo
-coverage/
-.npm/
+.turbo/
 
-# Celery & Background workers
+# --- Package Manager Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log
+
+# --- Docker & Background Services ---
+.docker/
+docker-compose.override.yml
+*.pid
 celerybeat-schedule
 celerybeat.pid
-*.pid
 
-# Docker overrides
-docker-compose.override.yml
+# --- Editors and IDEs ---
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.project
+.classpath
+.cproject
+.settings/
+
+# --- Operating System Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
