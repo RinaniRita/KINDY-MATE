@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Metric, Panel, StatusBadge } from "@/components/common/Cards";
 import { categories, demoRewards } from "@/lib/mock-data";
 import { apiGet, apiGetRequired, apiPatch } from "@/lib/api";
+import { prepareChildEntry } from "@/lib/child-entry";
 
 type ChildProfileData = {
   id: string;
@@ -42,9 +43,7 @@ export function ChildrenManager() {
   }, []);
 
   function handleSelectChild(childId: string) {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("active_child_id", childId);
-    }
+    prepareChildEntry(childId);
   }
 
   if (loading) {

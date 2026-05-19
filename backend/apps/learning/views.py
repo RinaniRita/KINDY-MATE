@@ -37,7 +37,7 @@ class MissionViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             child = ChildProfile.objects.select_related('wallet').get(id=child_id, parent=request.user)
         except ChildProfile.DoesNotExist:
-            return Response({'detail': 'Child profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'detail': 'Không tìm thấy hồ sơ trẻ.'}, status=status.HTTP_404_NOT_FOUND)
 
         attempt, wallet = complete_mission_for_child(child, mission, request.data.get('score', 100))
 

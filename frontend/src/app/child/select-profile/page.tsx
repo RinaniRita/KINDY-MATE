@@ -6,6 +6,7 @@ import { AppShell } from "@/components/common/AppShell";
 import { Panel } from "@/components/common/Cards";
 import { publicRoutes } from "@/lib/routes";
 import { apiGet } from "@/lib/api";
+import { prepareChildEntry } from "@/lib/child-entry";
 
 type ChildProfileData = {
   id: string;
@@ -32,9 +33,7 @@ export default function SelectProfilePage() {
   }, []);
 
   function handleSelectChild(childId: string) {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("active_child_id", childId);
-    }
+    prepareChildEntry(childId);
   }
 
   return (

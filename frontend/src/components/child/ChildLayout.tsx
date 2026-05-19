@@ -8,8 +8,8 @@ export function ChildLayout({ childId, children }: { childId: string; children: 
     <AppShell
       childId={childId}
       nav={childRoutes(childId)}
-      subtitle="Nhiệm vụ được hướng dẫn, không có cài đặt phụ huynh"
-      title="Khu trẻ em"
+      subtitle="Chạm vào một góc để bắt đầu"
+      title="Phòng của con"
       tone="child"
     >
       {children}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Metric, Panel } from "@/components/common/Cards";
 import { apiGetRequired } from "@/lib/api";
@@ -46,25 +46,28 @@ type ReportData = {
     duration_minutes: number;
     blocked_reason?: string;
     started_at: string;
+    ended_at?: string | null;
   }>;
 };
 
 const missionLabels: Record<string, string> = {
   creative: "Sáng tạo",
+  documentary: "Khám phá khoa học",
+  entertainment: "Giải trí",
   learning: "Học tập",
   movement: "Vận động",
-  reading: "Đọc",
-  reflection: "Nhìn lại",
-  screen_time: "Thời gian dùng app",
+  reading: "Đọc sách",
+  reflection: "Kỹ năng sống",
+  screen_time: "Dùng app",
 };
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("vi-VN", {
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
     month: "2-digit",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -76,41 +79,74 @@ export function ParentReports() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    apiGetRequired<ChildProfile[]>("/children/")
-      .then((data) => {
+    async function loadChildren() {
+      try {
+        const data = await apiGetRequired<ChildProfile[]>("/children/");
         setChildren(data);
-        const activeChildId =
-          typeof window !== "undefined" ? window.localStorage.getItem("active_child_id") : "";
+        const activeChildId = typeof window !== "undefined" ? window.localStorage.getItem("active_child_id") : "";
         const nextChildId = data.find((child) => child.id === activeChildId)?.id ?? data[0]?.id ?? "";
         setSelectedChildId(nextChildId);
         if (!nextChildId) setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         setError(err instanceof Error ? err.message : "Không thể tải danh sách trẻ.");
         setLoading(false);
-      });
+      }
+    }
+    loadChildren();
   }, []);
 
   useEffect(() => {
     if (!selectedChildId) return;
-    apiGetRequired<ReportData>(`/activity/dashboard/?child_id=${selectedChildId}`)
-      .then((data) => {
+    async function loadReport() {
+      setLoading(true);
+      try {
+        const data = await apiGetRequired<ReportData>(`/activity/dashboard/?child_id=${selectedChildId}`);
         setReport(data);
         if (typeof window !== "undefined") {
           window.localStorage.setItem("active_child_id", selectedChildId);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         setReport(null);
         setError(err instanceof Error ? err.message : "Không thể tải báo cáo.");
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadReport();
   }, [selectedChildId]);
+
+  const derived = useMemo(() => {
+    if (!report) {
+      return {
+        activeMinutes: 0,
+        passiveMinutes: 0,
+        activeRatio: 0,
+        passiveRatio: 0,
+        averagePointsPerMission: 0,
+      };
+    }
+    const activeMinutes =
+      report.metrics.learning_minutes +
+      report.metrics.reading_minutes +
+      report.metrics.movement_minutes +
+      report.metrics.creative_minutes;
+    const passiveMinutes = report.metrics.entertainment_minutes_today + report.metrics.documentary_minutes;
+    const totalTracked = Math.max(activeMinutes + passiveMinutes, 1);
+    return {
+      activeMinutes,
+      passiveMinutes,
+      activeRatio: Math.round((activeMinutes / totalTracked) * 100),
+      passiveRatio: Math.round((passiveMinutes / totalTracked) * 100),
+      averagePointsPerMission: report.metrics.mission_completion_count
+        ? Math.round(report.wallet.points_earned_total / report.metrics.mission_completion_count)
+        : 0,
+    };
+  }, [report]);
 
   if (loading) {
     return (
       <Panel eyebrow="Báo cáo" title="Đang tổng hợp dữ liệu">
-        <p className="text-sm font-semibold text-slate-500">Báo cáo được tạo từ nhiệm vụ, ví điểm và phiên sử dụng thật trong database.</p>
+        <p className="text-sm font-semibold text-slate-500">Báo cáo đang được tạo từ nhiệm vụ, giao dịch điểm và phiên sử dụng thật.</p>
       </Panel>
     );
   }
@@ -118,7 +154,7 @@ export function ParentReports() {
   if (!children.length) {
     return (
       <Panel eyebrow="Báo cáo" title="Chưa có dữ liệu báo cáo">
-        <p className="text-sm font-semibold text-slate-600">Hãy tạo hồ sơ trẻ và cho trẻ hoàn thành nhiệm vụ đầu tiên để báo cáo được ghi nhận.</p>
+        <p className="text-sm font-semibold text-slate-600">Hãy tạo hồ sơ trẻ và ghi nhận vài hoạt động đầu tiên để hệ thống có dữ liệu phân tích.</p>
       </Panel>
     );
   }
@@ -126,33 +162,20 @@ export function ParentReports() {
   if (error || !report) {
     return (
       <Panel eyebrow="Báo cáo" title="Không thể tải báo cáo">
-        <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-bold text-slate-700">
+        <p className="rounded-[1.5rem] border border-amber-100 bg-amber-50 p-4 text-sm font-bold text-slate-700">
           {error || "Báo cáo chưa sẵn sàng."}
         </p>
       </Panel>
     );
   }
 
-  const activeMinutes =
-    report.metrics.learning_minutes +
-    report.metrics.reading_minutes +
-    report.metrics.movement_minutes +
-    report.metrics.creative_minutes;
-  const passiveMinutes = report.metrics.entertainment_minutes_today + report.metrics.documentary_minutes;
-  const totalTracked = Math.max(activeMinutes + passiveMinutes, 1);
-  const activeRatio = Math.round((activeMinutes / totalTracked) * 100);
-  const passiveRatio = Math.round((passiveMinutes / totalTracked) * 100);
-  const averagePointsPerMission = report.metrics.mission_completion_count
-    ? Math.round(report.wallet.points_earned_total / report.metrics.mission_completion_count)
-    : 0;
-
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <Panel eyebrow="Báo cáo trẻ" title={`Báo cáo của ${report.child.nickname}`}>
+    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <Panel eyebrow="Phân tích" title={`Báo cáo của ${report.child.nickname}`}>
         <select
-          className="mb-6 min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 outline-none focus:border-emerald-400"
-          onChange={(event) => setSelectedChildId(event.target.value)}
+          className="mb-6 min-h-11 rounded-[1.25rem] border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 outline-none focus:border-emerald-400"
           value={selectedChildId}
+          onChange={(event) => setSelectedChildId(event.target.value)}
         >
           {children.map((child) => (
             <option key={child.id} value={child.id}>
@@ -163,93 +186,109 @@ export function ParentReports() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Metric label="Điểm hiện có" value={`${report.wallet.points_balance}`} variant="green" />
-          <Metric label="Tổng thời gian app" value={`${report.metrics.total_app_minutes || 0} phút`} variant="purple" />
+          <Metric label="Tổng thời gian app hôm nay" value={`${report.metrics.total_app_minutes} phút`} variant="purple" />
           <Metric label="Tổng điểm đã nhận" value={`${report.wallet.points_earned_total}`} variant="blue" />
           <Metric label="Tổng điểm đã dùng" value={`${report.wallet.points_spent_total}`} variant="yellow" />
-          <Metric label="Lượt chặn an toàn" value={`${report.metrics.blocked_attempts}`} variant="rose" />
+          <Metric label="Lượt bị chặn hôm nay" value={`${report.metrics.blocked_attempts}`} variant="rose" />
+          <Metric label="Nhiệm vụ hoàn thành hôm nay" value={`${report.metrics.mission_completion_count}`} variant="green" />
         </div>
 
-        <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-5">
-          <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Phân tích sâu</p>
-          <div className="mt-3 grid gap-3">
-            <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-700">
+        <div className="mt-6 rounded-[1.75rem] border border-[#dff6ee] bg-[#f3fbf7] p-5">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Phân tích sâu</p>
+          <div className="mt-4 grid gap-3">
+            <div className="flex items-center justify-between rounded-[1.25rem] bg-white px-4 py-3 text-sm font-bold text-slate-700">
               <span>Tỷ lệ hoạt động chủ động</span>
-              <span>{activeRatio}%</span>
+              <span>{derived.activeRatio}%</span>
             </div>
-            <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-700">
-              <span>Tỷ lệ giải trí/thụ động</span>
-              <span>{passiveRatio}%</span>
+            <div className="flex items-center justify-between rounded-[1.25rem] bg-white px-4 py-3 text-sm font-bold text-slate-700">
+              <span>Tỷ lệ giải trí và nội dung thụ động</span>
+              <span>{derived.passiveRatio}%</span>
             </div>
-            <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-700">
+            <div className="flex items-center justify-between rounded-[1.25rem] bg-white px-4 py-3 text-sm font-bold text-slate-700">
               <span>Điểm trung bình mỗi nhiệm vụ</span>
-              <span>{averagePointsPerMission} điểm</span>
+              <span>{derived.averagePointsPerMission} điểm</span>
+            </div>
+            <div className="flex items-center justify-between rounded-[1.25rem] bg-white px-4 py-3 text-sm font-bold text-slate-700">
+              <span>Phút chủ động / thụ động</span>
+              <span>
+                {derived.activeMinutes} / {derived.passiveMinutes}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
-          <p className="text-xs font-black uppercase tracking-wider text-sky-700">Tóm tắt hệ thống</p>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">{report.weekly_summary}</p>
+        <div className="mt-6 rounded-[1.75rem] border border-[#dff0ff] bg-[#f6fbff] p-5">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tóm tắt hệ thống</p>
+          <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">{report.weekly_summary}</p>
         </div>
       </Panel>
 
-      <Panel eyebrow="Chi tiết hoạt động" title="Nhiệm vụ và giao dịch gần đây">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-3xl border border-slate-100 bg-white p-5">
-            <p className="text-sm font-black text-slate-800">Phân bổ nhiệm vụ</p>
-            <div className="mt-4 space-y-3">
-              {Object.keys(report.mission_mix).length ? (
-                Object.entries(report.mission_mix).map(([type, count]) => (
-                  <div className="flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold" key={type}>
-                    <span>{missionLabels[type] ?? type}</span>
-                    <span>{count} lần</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm font-semibold text-slate-500">Chưa có nhiệm vụ hoàn thành.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-100 bg-white p-5">
-            <p className="text-sm font-black text-slate-800">Phiên sử dụng gần đây</p>
-            <div className="mt-4 space-y-3">
-              {report.recent_sessions.length ? (
-                report.recent_sessions.slice(0, 5).map((session) => (
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700" key={session.id}>
-                    <div className="flex justify-between gap-3">
-                      <span>{missionLabels[session.session_type] ?? session.session_type}</span>
-                      <span>{session.duration_minutes} phút</span>
+      <div className="grid gap-6">
+        <Panel eyebrow="Mẫu sử dụng" title="Timeline phiên sử dụng gần đây">
+          <div className="space-y-3">
+            {report.recent_sessions.length ? (
+              report.recent_sessions.map((session) => (
+                <div key={session.id} className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-slate-800">
+                        {missionLabels[session.session_type] ?? session.session_type}
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-slate-400">
+                        Bắt đầu: {formatDateTime(session.started_at)}
+                        {session.ended_at ? ` · Kết thúc: ${formatDateTime(session.ended_at)}` : ""}
+                      </p>
                     </div>
-                    {session.blocked_reason && <p className="mt-1 text-xs text-amber-700">Lý do chặn: {session.blocked_reason}</p>}
+                    <span className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-700">
+                      {session.duration_minutes} phút
+                    </span>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm font-semibold text-slate-500">Chưa có phiên sử dụng.</p>
-              )}
-            </div>
+                  {session.blocked_reason ? (
+                    <p className="mt-3 rounded-[1rem] bg-amber-50 px-3 py-2 text-xs font-bold leading-6 text-amber-700">
+                      Lý do chặn: {session.blocked_reason}
+                    </p>
+                  ) : null}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm font-semibold text-slate-500">Chưa có phiên sử dụng nào.</p>
+            )}
           </div>
-        </div>
+        </Panel>
 
-        <div className="mt-5 rounded-3xl border border-slate-100 bg-white p-5">
-          <p className="text-sm font-black text-slate-800">Giao dịch điểm</p>
-          <div className="mt-4 space-y-3">
+        <Panel eyebrow="Phân bổ nhiệm vụ" title="Nhóm nhiệm vụ nổi bật trong vài ngày gần đây">
+          <div className="grid gap-3">
+            {Object.keys(report.mission_mix).length ? (
+              Object.entries(report.mission_mix).map(([type, count]) => (
+                <div key={type} className="flex items-center justify-between rounded-[1.25rem] bg-[#f6fbff] px-4 py-3 text-sm font-bold text-slate-700">
+                  <span>{missionLabels[type] ?? type}</span>
+                  <span>{count} lần</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm font-semibold text-slate-500">Chưa có nhiệm vụ hoàn thành gần đây.</p>
+            )}
+          </div>
+        </Panel>
+
+        <Panel eyebrow="Điểm thưởng" title="Timeline giao dịch gần đây">
+          <div className="space-y-3">
             {report.recent_transactions.length ? (
               report.recent_transactions.map((transaction) => (
-                <div className="flex flex-col justify-between gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-slate-700 sm:flex-row" key={transaction.id}>
-                  <span>
-                    {transaction.reason}
+                <div key={transaction.id} className="flex flex-col gap-2 rounded-[1.5rem] bg-[#fffaf0] px-4 py-4 text-sm font-bold text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <span>{transaction.reason}</span>
                     <span className="mt-1 block text-xs text-slate-400">{formatDateTime(transaction.created_at)}</span>
-                  </span>
+                  </div>
                   <span>{transaction.points > 0 ? "+" : ""}{transaction.points} điểm</span>
                 </div>
               ))
             ) : (
-              <p className="text-sm font-semibold text-slate-500">Chưa có giao dịch điểm.</p>
+              <p className="text-sm font-semibold text-slate-500">Chưa có giao dịch điểm nào.</p>
             )}
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      </div>
     </div>
   );
 }

@@ -58,9 +58,21 @@ class RewardItem(models.Model):
         PENDING = 'pending', 'Pending'
         BLOCKED = 'blocked', 'Blocked'
 
+    class DisplayCategory(models.TextChoices):
+        PHIM_HOAT_HINH = 'phim_hoat_hinh', 'Phim hoạt hình'
+        KHAM_PHA_KHOA_HOC = 'kham_pha_khoa_hoc', 'Khám phá khoa học'
+        TO_MAU = 'to_mau', 'Tô màu'
+        GAME_NHE_NHANG = 'game_nhe_nhang', 'Game nhẹ nhàng'
+        MASCOT = 'mascot', 'Đồ cho mascot'
+
     title = models.CharField(max_length=160)
     description = models.TextField(blank=True)
     reward_type = models.CharField(max_length=24, choices=RewardType.choices)
+    display_category = models.CharField(
+        max_length=32,
+        choices=DisplayCategory.choices,
+        default=DisplayCategory.GAME_NHE_NHANG,
+    )
     points_cost = models.PositiveSmallIntegerField(default=5)
     duration_minutes = models.PositiveSmallIntegerField(default=0)
     content_item = models.ForeignKey(

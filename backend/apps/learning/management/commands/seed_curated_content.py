@@ -10,6 +10,52 @@ from apps.gamification.models import RewardItem
 C = ContentItem.ContentType
 A = ContentItem.ApprovalStatus
 
+
+def content_display_category(item):
+    content_type = item['content_type']
+    title = item['title'].lower()
+    if content_type == C.READING:
+        return ContentItem.DisplayCategory.DOC_SACH
+    if content_type == C.MOVEMENT:
+        return ContentItem.DisplayCategory.VAN_DONG
+    if content_type == C.CREATIVE:
+        return ContentItem.DisplayCategory.SANG_TAO
+    if content_type == C.REFLECTION:
+        return ContentItem.DisplayCategory.KY_NANG_SONG
+    if content_type == C.DOCUMENTARY:
+        return ContentItem.DisplayCategory.KHAM_PHA_KHOA_HOC
+    if content_type == C.ENTERTAINMENT:
+        if 'tô màu' in title:
+            return ContentItem.DisplayCategory.TO_MAU
+        return ContentItem.DisplayCategory.PHIM_HOAT_HINH
+    if content_type == C.CUSTOMIZATION or content_type == C.MASCOT_ITEM:
+        return ContentItem.DisplayCategory.MASCOT
+    return ContentItem.DisplayCategory.HOC_HANH
+
+
+def mission_display_category(mission_type):
+    mapping = {
+        'learning': Mission.DisplayCategory.HOC_HANH,
+        'reading': Mission.DisplayCategory.DOC_SACH,
+        'movement': Mission.DisplayCategory.VAN_DONG,
+        'creative': Mission.DisplayCategory.SANG_TAO,
+        'reflection': Mission.DisplayCategory.KY_NANG_SONG,
+    }
+    return mapping.get(mission_type, Mission.DisplayCategory.HOC_HANH)
+
+
+def reward_display_category(title, reward_type):
+    lowered = title.lower()
+    if reward_type == RewardItem.RewardType.DOCUMENTARY:
+        return RewardItem.DisplayCategory.KHAM_PHA_KHOA_HOC
+    if reward_type == RewardItem.RewardType.MASCOT_ITEM:
+        return RewardItem.DisplayCategory.MASCOT
+    if 'tô màu' in lowered:
+        return RewardItem.DisplayCategory.TO_MAU
+    if 'sesame' in lowered or 'dora' in lowered or 'curious george' in lowered:
+        return RewardItem.DisplayCategory.PHIM_HOAT_HINH
+    return RewardItem.DisplayCategory.GAME_NHE_NHANG
+
 CONTENT = [
     # ── Khan Academy Kids (Math & Reading, ages 2-8, free, no ads) ──
     {'title': 'Đếm số 1-10 cùng Khan Academy Kids', 'content_type': C.LEARNING, 'age_min': 2, 'age_max': 5,
@@ -197,6 +243,7 @@ class Command(BaseCommand):
             defaults = {k: v for k, v in item.items() if k != 'title'}
             defaults.setdefault('demo_only', False)
             defaults.setdefault('approval_status', A.APPROVED)
+            defaults.setdefault('display_category', content_display_category(item))
             ContentItem.objects.update_or_create(title=item['title'], defaults=defaults)
 
         type_map = {'learning': Mission.MissionType.LEARNING, 'reading': Mission.MissionType.READING,
@@ -210,6 +257,7 @@ class Command(BaseCommand):
                     'description': m['desc'],
                     'points_reward': m['pts'],
                     'estimated_duration_minutes': m['mins'],
+                    'display_category': mission_display_category(m['type']),
                     'age_min': m.get('age_min', 5),
                     'age_max': m.get('age_max', 9),
                     'verification_method': m['verify'],
@@ -232,6 +280,7 @@ class Command(BaseCommand):
                 title=title,
                 defaults={
                     'reward_type': rtype,
+                    'display_category': reward_display_category(title, rtype),
                     'points_cost': cost,
                     'duration_minutes': mins,
                     'description': f'Nội dung giáo dục chọn lọc từ nguồn uy tín quốc tế.',

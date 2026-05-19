@@ -22,9 +22,26 @@ class ContentItem(models.Model):
         MEDIUM = 'medium', 'Medium'
         HIGH = 'high', 'High'
 
+    class DisplayCategory(models.TextChoices):
+        HOC_HANH = 'hoc_hanh', 'Học hành'
+        DOC_SACH = 'doc_sach', 'Đọc sách'
+        VAN_DONG = 'van_dong', 'Vận động'
+        KY_NANG_SONG = 'ky_nang_song', 'Kỹ năng sống'
+        SANG_TAO = 'sang_tao', 'Sáng tạo'
+        PHIM_HOAT_HINH = 'phim_hoat_hinh', 'Phim hoạt hình'
+        KHAM_PHA_KHOA_HOC = 'kham_pha_khoa_hoc', 'Khám phá khoa học'
+        TO_MAU = 'to_mau', 'Tô màu'
+        GAME_NHE_NHANG = 'game_nhe_nhang', 'Game nhẹ nhàng'
+        MASCOT = 'mascot', 'Đồ cho mascot'
+
     title = models.CharField(max_length=160)
     description = models.TextField(blank=True)
     content_type = models.CharField(max_length=24, choices=ContentType.choices)
+    display_category = models.CharField(
+        max_length=32,
+        choices=DisplayCategory.choices,
+        default=DisplayCategory.HOC_HANH,
+    )
     age_min = models.PositiveSmallIntegerField(default=5)
     age_max = models.PositiveSmallIntegerField(default=9)
     difficulty_level = models.CharField(max_length=40, default='easy')
@@ -71,7 +88,19 @@ class Mission(models.Model):
         CREATIVE = 'creative', 'Creative'
         REFLECTION = 'reflection', 'Reflection'
 
+    class DisplayCategory(models.TextChoices):
+        HOC_HANH = 'hoc_hanh', 'Học hành'
+        DOC_SACH = 'doc_sach', 'Đọc sách'
+        VAN_DONG = 'van_dong', 'Vận động'
+        KY_NANG_SONG = 'ky_nang_song', 'Kỹ năng sống'
+        SANG_TAO = 'sang_tao', 'Sáng tạo'
+
     mission_type = models.CharField(max_length=16, choices=MissionType.choices)
+    display_category = models.CharField(
+        max_length=24,
+        choices=DisplayCategory.choices,
+        default=DisplayCategory.HOC_HANH,
+    )
     title = models.CharField(max_length=160)
     description = models.TextField()
     age_min = models.PositiveSmallIntegerField(default=5)

@@ -1,13 +1,13 @@
 import { ChildLayout } from "@/components/child/ChildLayout";
-import { RewardShop } from "@/components/child/ChildExperience";
+import { EntertainmentPage } from "@/components/child/EntertainmentPage";
 
 type Params = Promise<{ childId: string }>;
 
-export default async function EntertainmentPage({ params }: { params: Params }) {
+export default async function EntertainmentRoutePage({ params }: { params: Params }) {
   const { childId } = await params;
   return (
     <ChildLayout childId={childId}>
-      <RewardShop childId={childId} />
+      <EntertainmentPage childId={childId} />
     </ChildLayout>
   );
 }

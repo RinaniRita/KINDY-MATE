@@ -1,5 +1,5 @@
-from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
 
 from apps.activity_logger.models import ActivityLog, EntertainmentSession, ParentAlert, UsageSession
 from apps.gamification.models import ChildMascotInventory, MascotItem, RewardItem, RewardWallet
@@ -8,15 +8,15 @@ from apps.profiles.models import ChildProfile, ParentRule
 
 
 class Command(BaseCommand):
-    help = 'Seed Kindy-Mate demo missions and approved content.'
+    help = 'Seed dữ liệu demo Kindy-Mate có phân nhóm cho khu trẻ em.'
 
     def handle(self, *args, **options):
-        User = get_user_model()
-        parent, _ = User.objects.update_or_create(
+        user_model = get_user_model()
+        parent, _ = user_model.objects.update_or_create(
             username='demo_parent',
             defaults={
                 'email': 'parent@kindymate.local',
-                'role': User.Role.PARENT,
+                'role': user_model.Role.PARENT,
                 'consent_status': True,
                 'is_staff': True,
             },
@@ -52,6 +52,7 @@ class Command(BaseCommand):
             {
                 'title': 'Truyện ngắn: Đám mây biết đếm',
                 'content_type': ContentItem.ContentType.READING,
+                'display_category': ContentItem.DisplayCategory.DOC_SACH,
                 'age_min': 6,
                 'age_max': 8,
                 'estimated_duration_minutes': 4,
@@ -64,6 +65,7 @@ class Command(BaseCommand):
             {
                 'title': 'Đếm sao theo nhóm',
                 'content_type': ContentItem.ContentType.LEARNING,
+                'display_category': ContentItem.DisplayCategory.HOC_HANH,
                 'age_min': 5,
                 'age_max': 7,
                 'estimated_duration_minutes': 5,
@@ -76,6 +78,7 @@ class Command(BaseCommand):
             {
                 'title': '10 lần đứng lên ngồi xuống nhẹ',
                 'content_type': ContentItem.ContentType.MOVEMENT,
+                'display_category': ContentItem.DisplayCategory.VAN_DONG,
                 'age_min': 6,
                 'age_max': 9,
                 'estimated_duration_minutes': 3,
@@ -86,8 +89,22 @@ class Command(BaseCommand):
                 'safety_notes': 'Không cần dụng cụ, có lựa chọn không dùng camera.',
             },
             {
+                'title': 'Sắp xếp bàn học trong 3 phút',
+                'content_type': ContentItem.ContentType.REFLECTION,
+                'display_category': ContentItem.DisplayCategory.KY_NANG_SONG,
+                'age_min': 5,
+                'age_max': 8,
+                'estimated_duration_minutes': 3,
+                'learning_objective': 'Rèn nếp gọn gàng và chủ động hoàn thành việc nhỏ.',
+                'related_sdg': 'SDG4',
+                'points_reward_or_cost': 5,
+                'cooldown_category': 'life_skills',
+                'safety_notes': 'Chỉ là việc nhỏ trong nhà, không yêu cầu chia sẻ dữ liệu cá nhân.',
+            },
+            {
                 'title': 'Video đại dương 5 phút',
                 'content_type': ContentItem.ContentType.DOCUMENTARY,
+                'display_category': ContentItem.DisplayCategory.KHAM_PHA_KHOA_HOC,
                 'age_min': 6,
                 'age_max': 9,
                 'estimated_duration_minutes': 5,
@@ -99,8 +116,22 @@ class Command(BaseCommand):
                 'safety_notes': 'Không autoplay, không feed vô hạn, mức kích thích thấp.',
             },
             {
+                'title': 'Tô màu khu vườn yên tĩnh',
+                'content_type': ContentItem.ContentType.ENTERTAINMENT,
+                'display_category': ContentItem.DisplayCategory.TO_MAU,
+                'age_min': 5,
+                'age_max': 8,
+                'estimated_duration_minutes': 6,
+                'learning_objective': 'Giải trí nhẹ và luyện tập trung với nhịp chậm.',
+                'points_reward_or_cost': -8,
+                'cooldown_category': 'entertainment',
+                'license_status': 'Internal demo asset.',
+                'safety_notes': 'Không âm thanh dồn dập, không tính điểm thắng thua.',
+            },
+            {
                 'title': 'Mũ phi hành gia cho Milo',
                 'content_type': ContentItem.ContentType.CUSTOMIZATION,
+                'display_category': ContentItem.DisplayCategory.MASCOT,
                 'age_min': 5,
                 'age_max': 9,
                 'estimated_duration_minutes': 0,
@@ -113,6 +144,7 @@ class Command(BaseCommand):
             {
                 'title': 'Clip khu rừng cần duyệt',
                 'content_type': ContentItem.ContentType.DOCUMENTARY,
+                'display_category': ContentItem.DisplayCategory.KHAM_PHA_KHOA_HOC,
                 'age_min': 6,
                 'age_max': 9,
                 'estimated_duration_minutes': 8,
@@ -128,16 +160,14 @@ class Command(BaseCommand):
 
         content_by_title = {}
         for item in content_items:
-            content, _ = ContentItem.objects.update_or_create(
-                title=item['title'],
-                defaults=item,
-            )
+            content, _ = ContentItem.objects.update_or_create(title=item['title'], defaults=item)
             content_by_title[content.title] = content
 
         missions = [
             {
                 'title': 'Đọc truyện 4 phút',
                 'mission_type': Mission.MissionType.READING,
+                'display_category': Mission.DisplayCategory.DOC_SACH,
                 'description': 'Đọc truyện ngắn về đám mây, sau đó trả lời 2 câu hỏi hiểu bài.',
                 'points_reward': 8,
                 'estimated_duration_minutes': 4,
@@ -148,6 +178,7 @@ class Command(BaseCommand):
             {
                 'title': 'Đếm sao theo nhóm',
                 'mission_type': Mission.MissionType.LEARNING,
+                'display_category': Mission.DisplayCategory.HOC_HANH,
                 'description': 'Giải 3 câu toán cộng đơn giản bằng hình ảnh sao.',
                 'points_reward': 9,
                 'estimated_duration_minutes': 5,
@@ -158,6 +189,7 @@ class Command(BaseCommand):
             {
                 'title': '10 lần đứng lên ngồi xuống nhẹ',
                 'mission_type': Mission.MissionType.MOVEMENT,
+                'display_category': Mission.DisplayCategory.VAN_DONG,
                 'description': 'Hoàn thành bài vận động ngắn, cường độ thấp.',
                 'points_reward': 6,
                 'estimated_duration_minutes': 3,
@@ -166,47 +198,87 @@ class Command(BaseCommand):
                 'safety_notes': 'Dừng lại nếu mệt hoặc không đủ không gian.',
             },
             {
+                'title': 'Sắp xếp góc học tập',
+                'mission_type': Mission.MissionType.REFLECTION,
+                'display_category': Mission.DisplayCategory.KY_NANG_SONG,
+                'description': 'Dành vài phút để cất bút, xếp sách và chuẩn bị bàn học gọn gàng.',
+                'points_reward': 5,
+                'estimated_duration_minutes': 3,
+                'source_content': content_by_title['Sắp xếp bàn học trong 3 phút'],
+                'verification_method': 'guided_prompt',
+                'safety_notes': 'Chỉ yêu cầu thao tác đơn giản, không cần chụp hình.',
+            },
+            {
                 'title': 'Vẽ kết thúc câu chuyện',
                 'mission_type': Mission.MissionType.CREATIVE,
+                'display_category': Mission.DisplayCategory.SANG_TAO,
                 'description': 'Vẽ một cảnh kết thúc bình yên cho câu chuyện vừa đọc.',
                 'points_reward': 7,
                 'estimated_duration_minutes': 6,
                 'verification_method': 'parent_review_optional',
                 'safety_notes': 'Không yêu cầu ảnh mặt hoặc dữ liệu nhận dạng.',
             },
-            {
-                'title': 'Một từ mới hôm nay',
-                'mission_type': Mission.MissionType.REFLECTION,
-                'description': 'Chọn một từ mới và nói nghĩa đơn giản của từ đó.',
-                'points_reward': 4,
-                'estimated_duration_minutes': 2,
-                'verification_method': 'guided_prompt',
-                'safety_notes': 'Không hỏi cảm xúc sâu, bí mật hoặc chủ đề nhạy cảm.',
-            },
         ]
 
         for mission in missions:
             Mission.objects.update_or_create(title=mission['title'], defaults=mission)
 
-        for title, reward_type, cost, minutes, content_title in [
-            ('Video đại dương 5 phút', RewardItem.RewardType.DOCUMENTARY, 10, 5, 'Video đại dương 5 phút'),
-            ('Ghép hình bình tĩnh', RewardItem.RewardType.ENTERTAINMENT, 8, 6, None),
-            ('Mũ phi hành gia cho Milo', RewardItem.RewardType.MASCOT_ITEM, 6, 0, 'Mũ phi hành gia cho Milo'),
-            ('Clip khu rừng cần duyệt', RewardItem.RewardType.DOCUMENTARY, 12, 8, 'Clip khu rừng cần duyệt'),
-        ]:
-            content = content_by_title.get(content_title) if content_title else None
-            RewardItem.objects.update_or_create(
-                title=title,
-                defaults={
-                    'reward_type': reward_type,
-                    'points_cost': cost,
-                    'duration_minutes': minutes,
-                    'content_item': content,
-                    'approval_status': RewardItem.ApprovalStatus.PENDING if 'cần duyệt' in title else RewardItem.ApprovalStatus.APPROVED,
-                    'description': 'Demo reward item with child-safe metadata.',
-                    'demo_only': True,
-                },
-            )
+        reward_items = [
+            {
+                'title': 'Video đại dương 5 phút',
+                'reward_type': RewardItem.RewardType.DOCUMENTARY,
+                'display_category': RewardItem.DisplayCategory.KHAM_PHA_KHOA_HOC,
+                'points_cost': 10,
+                'duration_minutes': 5,
+                'content_item': content_by_title['Video đại dương 5 phút'],
+            },
+            {
+                'title': 'Ghép hình bình tĩnh',
+                'reward_type': RewardItem.RewardType.ENTERTAINMENT,
+                'display_category': RewardItem.DisplayCategory.GAME_NHE_NHANG,
+                'points_cost': 8,
+                'duration_minutes': 6,
+                'content_item': None,
+            },
+            {
+                'title': 'Tô màu khu vườn yên tĩnh',
+                'reward_type': RewardItem.RewardType.ENTERTAINMENT,
+                'display_category': RewardItem.DisplayCategory.TO_MAU,
+                'points_cost': 8,
+                'duration_minutes': 6,
+                'content_item': content_by_title['Tô màu khu vườn yên tĩnh'],
+            },
+            {
+                'title': 'Mũ phi hành gia cho Milo',
+                'reward_type': RewardItem.RewardType.MASCOT_ITEM,
+                'display_category': RewardItem.DisplayCategory.MASCOT,
+                'points_cost': 6,
+                'duration_minutes': 0,
+                'content_item': content_by_title['Mũ phi hành gia cho Milo'],
+            },
+            {
+                'title': 'Clip khu rừng cần duyệt',
+                'reward_type': RewardItem.RewardType.DOCUMENTARY,
+                'display_category': RewardItem.DisplayCategory.KHAM_PHA_KHOA_HOC,
+                'points_cost': 12,
+                'duration_minutes': 8,
+                'content_item': content_by_title['Clip khu rừng cần duyệt'],
+                'approval_status': RewardItem.ApprovalStatus.PENDING,
+            },
+        ]
+
+        for reward in reward_items:
+            defaults = {
+                'reward_type': reward['reward_type'],
+                'display_category': reward['display_category'],
+                'points_cost': reward['points_cost'],
+                'duration_minutes': reward['duration_minutes'],
+                'content_item': reward.get('content_item'),
+                'approval_status': reward.get('approval_status', RewardItem.ApprovalStatus.APPROVED),
+                'description': 'Nội dung giải trí an toàn cho trẻ trong hệ sinh thái Kindy-Mate.',
+                'demo_only': True,
+            }
+            RewardItem.objects.update_or_create(title=reward['title'], defaults=defaults)
 
         mascot_items = [
             ('Mũ phi hành gia', MascotItem.ItemType.ACCESSORY, 6),
@@ -234,6 +306,7 @@ class Command(BaseCommand):
             child=child,
             session_type=UsageSession.SessionType.READING,
             duration_minutes=12,
+            ended_at=child.created_at,
             notes='Seeded reading activity.',
         )
         EntertainmentSession.objects.get_or_create(

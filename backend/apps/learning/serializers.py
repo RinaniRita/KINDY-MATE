@@ -4,6 +4,8 @@ from .models import ContentItem, Mission, MissionAttempt
 
 
 class ContentItemSerializer(serializers.ModelSerializer):
+    display_category_label = serializers.CharField(source='get_display_category_display', read_only=True)
+
     class Meta:
         model = ContentItem
         fields = '__all__'
@@ -11,6 +13,8 @@ class ContentItemSerializer(serializers.ModelSerializer):
 
 class MissionSerializer(serializers.ModelSerializer):
     source_content = ContentItemSerializer(read_only=True)
+    display_category_label = serializers.CharField(source='get_display_category_display', read_only=True)
+    mission_type_label = serializers.CharField(source='get_mission_type_display', read_only=True)
 
     class Meta:
         model = Mission

@@ -1,13 +1,13 @@
 import { ChildLayout } from "@/components/child/ChildLayout";
-import { MascotPage } from "@/components/child/ChildExperience";
+import { MiloHub } from "@/components/child/MiloHub";
 
 type Params = Promise<{ childId: string }>;
 
-export default async function MascotRoutePage({ params }: { params: Params }) {
+export default async function MiloPage({ params }: { params: Params }) {
   const { childId } = await params;
   return (
     <ChildLayout childId={childId}>
-      <MascotPage childId={childId} />
+      <MiloHub childId={childId} />
     </ChildLayout>
   );
 }

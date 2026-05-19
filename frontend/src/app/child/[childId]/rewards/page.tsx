@@ -1,13 +1,8 @@
-import { ChildLayout } from "@/components/child/ChildLayout";
-import { RewardShop } from "@/components/child/ChildExperience";
+import { redirect } from "next/navigation";
 
 type Params = Promise<{ childId: string }>;
 
 export default async function RewardsPage({ params }: { params: Params }) {
   const { childId } = await params;
-  return (
-    <ChildLayout childId={childId}>
-      <RewardShop childId={childId} />
-    </ChildLayout>
-  );
+  redirect(`/child/${childId}/entertainment`);
 }

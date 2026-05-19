@@ -12,7 +12,7 @@ from .serializers import (
     RewardItemSerializer,
     RewardWalletSerializer,
 )
-from .services import spend_reward_for_child
+from .services import FRIENDLY_BLOCK_MESSAGES, check_reward_access, spend_reward_for_child
 
 
 def get_child(request, child_id):
@@ -26,7 +26,7 @@ def wallet_detail(request):
     try:
         child = get_child(request, child_id)
     except ChildProfile.DoesNotExist:
-        return Response({'detail': 'Child profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'Không tìm thấy hồ sơ trẻ.'}, status=status.HTTP_404_NOT_FOUND)
     return Response(RewardWalletSerializer(child.wallet).data)
 
 
@@ -47,6 +47,18 @@ class RewardItemViewSet(viewsets.ModelViewSet):
             )
         return queryset.select_related('content_item')
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        child_id = self.request.query_params.get('child_id')
+        if child_id:
+            try:
+                context['child'] = get_child(self.request, child_id)
+            except ChildProfile.DoesNotExist:
+                context['child'] = None
+        context['check_reward_access'] = check_reward_access
+        context['friendly_messages'] = FRIENDLY_BLOCK_MESSAGES
+        return context
+
 
 class MascotItemViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MascotItemSerializer
@@ -62,7 +74,7 @@ def mascot_inventory(request):
     try:
         child = get_child(request, child_id)
     except ChildProfile.DoesNotExist:
-        return Response({'detail': 'Child profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'Không tìm thấy hồ sơ trẻ.'}, status=status.HTTP_404_NOT_FOUND)
     inventory = ChildMascotInventory.objects.filter(child=child).select_related('item')
     return Response(ChildMascotInventorySerializer(inventory, many=True).data)
 
@@ -76,9 +88,9 @@ def spend_reward(request):
         child = get_child(request, child_id)
         reward_item = RewardItem.objects.select_related('content_item').get(id=reward_item_id, active=True)
     except ChildProfile.DoesNotExist:
-        return Response({'detail': 'Child profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'Không tìm thấy hồ sơ trẻ.'}, status=status.HTTP_404_NOT_FOUND)
     except RewardItem.DoesNotExist:
-        return Response({'detail': 'Reward content not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'Không tìm thấy mục giải trí.'}, status=status.HTTP_404_NOT_FOUND)
 
     allowed, detail, wallet = spend_reward_for_child(child, reward_item)
     if not allowed:

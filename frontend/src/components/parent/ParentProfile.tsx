@@ -1,10 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Panel } from "@/components/common/Cards";
 import { apiGetRequired, apiPatch, type AuthResponse } from "@/lib/api";
-import { updateAuthUser } from "@/lib/auth";
+import { clearAuthSession, updateAuthUser } from "@/lib/auth";
 
 type ParentUser = AuthResponse["user"] & {
   created_at?: string;
@@ -18,6 +19,7 @@ const avatars = [
 ];
 
 export function ParentProfile() {
+  const router = useRouter();
   const [user, setUser] = useState<ParentUser | null>(null);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -48,9 +50,9 @@ export function ParentProfile() {
     setStatus("");
     try {
       const payload: Record<string, string> = {
-        avatar_id: avatarId,
-        email: email.trim(),
         username: username.trim(),
+        email: email.trim(),
+        avatar_id: avatarId,
       };
       if (password.trim()) payload.password = password.trim();
       const updated = await apiPatch<ParentUser>("/auth/me/", payload);
@@ -65,10 +67,15 @@ export function ParentProfile() {
     }
   }
 
+  function handleLogout() {
+    clearAuthSession();
+    router.push("/auth/login");
+  }
+
   if (loading && !user) {
     return (
       <Panel eyebrow="Tài khoản phụ huynh" title="Đang tải hồ sơ">
-        <p className="text-sm font-semibold text-slate-500">Kindy-Mate đang lấy thông tin tài khoản từ hệ thống.</p>
+        <p className="text-sm font-semibold text-slate-500">Kindy-Mate đang lấy thông tin tài khoản.</p>
       </Panel>
     );
   }
@@ -76,20 +83,28 @@ export function ParentProfile() {
   return (
     <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
       <Panel eyebrow="Tài khoản phụ huynh" title="Hồ sơ đăng nhập">
-        <div className="flex items-center gap-4 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5">
+        <div className="flex items-center gap-4 rounded-[1.75rem] border border-emerald-100 bg-emerald-50/60 p-5">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-2xl font-black text-emerald-700 shadow-sm">
             {username.slice(0, 2).toUpperCase() || "PH"}
           </div>
           <div>
             <p className="text-lg font-black text-slate-800">{username || "Phụ huynh"}</p>
             <p className="text-sm font-bold text-slate-500">{email || "Chưa có email"}</p>
-            <p className="mt-1 text-xs font-bold text-emerald-700">Vai trò: phụ huynh quản lý tài khoản trẻ</p>
+            <p className="mt-1 text-xs font-bold text-emerald-700">Chủ tài khoản quản lý toàn bộ dữ liệu trẻ</p>
           </div>
         </div>
 
-        <div className="mt-5 rounded-3xl border border-amber-100 bg-amber-50/70 p-5 text-sm font-semibold leading-6 text-slate-600">
-          Trẻ không có tài khoản riêng trong phiên bản này. Mọi hồ sơ trẻ, luật sử dụng và dữ liệu báo cáo đều nằm dưới tài khoản phụ huynh.
+        <div className="mt-5 rounded-[1.75rem] border border-amber-100 bg-amber-50/70 p-5 text-sm font-semibold leading-6 text-slate-600">
+          Trẻ không có tài khoản riêng trong giai đoạn này. Hồ sơ trẻ, luật sử dụng và báo cáo đều thuộc phiên đăng nhập của phụ huynh.
         </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-5 min-h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm"
+        >
+          Đăng xuất
+        </button>
       </Panel>
 
       <Panel eyebrow="Chỉnh sửa" title="Cập nhật thông tin cá nhân">
@@ -97,33 +112,33 @@ export function ParentProfile() {
           <label className="grid gap-2 text-sm font-black text-slate-700">
             Tên đăng nhập
             <input
-              className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-bold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              value={username}
               onChange={(event) => setUsername(event.target.value)}
               required
-              value={username}
+              className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-bold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
           <label className="grid gap-2 text-sm font-black text-slate-700">
             Email
             <input
-              className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-bold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+              value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
               type="email"
-              value={email}
+              className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-bold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
           <label className="grid gap-2 text-sm font-black text-slate-700">
             Mật khẩu mới
             <input
-              className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-bold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Để trống nếu không đổi mật khẩu"
-              type="password"
               value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={8}
+              type="password"
+              placeholder="Để trống nếu chưa đổi"
+              className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 font-bold outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
@@ -132,14 +147,14 @@ export function ParentProfile() {
             <div className="grid gap-3 sm:grid-cols-4">
               {avatars.map((avatar) => (
                 <button
+                  key={avatar.id}
+                  type="button"
+                  onClick={() => setAvatarId(avatar.id)}
                   className={`rounded-2xl border p-4 text-left transition ${
                     avatarId === avatar.id
                       ? "border-emerald-400 bg-emerald-50 ring-4 ring-emerald-100"
                       : "border-slate-200 bg-white hover:border-slate-300"
                   }`}
-                  key={avatar.id}
-                  onClick={() => setAvatarId(avatar.id)}
-                  type="button"
                 >
                   <span className={`block h-9 w-9 rounded-xl ${avatar.swatch}`} />
                   <span className="mt-3 block text-xs font-black text-slate-700">{avatar.label}</span>
@@ -148,16 +163,16 @@ export function ParentProfile() {
             </div>
           </div>
 
-          {status && (
+          {status ? (
             <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm font-bold text-slate-700">
               {status}
             </div>
-          )}
+          ) : null}
 
           <button
-            className="min-h-13 rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-100 disabled:opacity-60"
-            disabled={saving}
             type="submit"
+            disabled={saving}
+            className="min-h-13 rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-100 disabled:opacity-60"
           >
             {saving ? "Đang lưu..." : "Lưu thay đổi"}
           </button>

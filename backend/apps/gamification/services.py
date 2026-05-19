@@ -118,6 +118,7 @@ def spend_reward_for_child(child, reward_item):
         return False, message, child.wallet
 
     wallet = child.wallet
+    now = timezone.now()
     wallet.points_balance -= reward_item.points_cost
     wallet.points_spent_total += reward_item.points_cost
     wallet.save(update_fields=['points_balance', 'points_spent_total', 'updated_at'])
@@ -137,10 +138,10 @@ def spend_reward_for_child(child, reward_item):
         duration_minutes_allowed=reward_item.duration_minutes,
         duration_minutes_actual=reward_item.duration_minutes,
         status=EntertainmentSession.Status.COMPLETED,
-        started_at=timezone.now(),
-        ended_at=timezone.now(),
+        started_at=now,
+        ended_at=now,
     )
-    UsageSession.objects.create(
+    usage_session = UsageSession.objects.create(
         child=child,
         session_type=reward_item.reward_type,
         content=content,
@@ -148,6 +149,9 @@ def spend_reward_for_child(child, reward_item):
         points_spent=reward_item.points_cost,
         notes='Reward allowed within parent rules.',
     )
+    if reward_item.duration_minutes > 0:
+        usage_session.ended_at = usage_session.started_at + timedelta(minutes=reward_item.duration_minutes)
+        usage_session.save(update_fields=['ended_at'])
     ActivityLog.objects.create(
         child=child,
         event_type='reward_spent',

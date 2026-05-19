@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { Metric, Panel } from "@/components/common/Cards";
 import { apiGet, apiGetRequired } from "@/lib/api";
+import { prepareChildEntry } from "@/lib/child-entry";
 
 type ChildProfile = {
   id: string;
@@ -255,6 +256,7 @@ export function ParentDashboard() {
         </span>
         <Link
           href={`/child/${selectedChildId}/home`}
+          onClick={() => prepareChildEntry(selectedChildId)}
           className="bubbly-btn ml-auto rounded-2xl bg-gradient-to-r from-blue-400 to-indigo-400 px-5 py-2.5 text-xs font-black text-white shadow-md"
         >
           ▶ Vào khu trẻ em
