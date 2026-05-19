@@ -1,10 +1,10 @@
-import { Settings } from "@/components/parent/ParentControls";
 import { ParentLayout } from "@/components/parent/ParentLayout";
+import { ParentSettings } from "@/components/parent/ParentSettings";
 
 export default function SettingsPage() {
   return (
     <ParentLayout>
-      <Settings />
+      <ParentSettings />
     </ParentLayout>
   );
 }

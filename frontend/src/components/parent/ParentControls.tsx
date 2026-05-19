@@ -454,7 +454,11 @@ export function ContentApproval() {
   }
 
   return (
-    <Panel eyebrow="Kho nội dung số" title="Hàng đợi duyệt nội dung & quà tặng">
+    <Panel eyebrow="Kho nội dung số" title="Quản lý nội dung & quà tặng an toàn">
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 text-xs font-bold leading-relaxed text-slate-700">
+        Quà tặng đã được hệ thống duyệt an toàn sẽ tự mở cho trẻ khi trẻ đủ điểm và không vi phạm giới hạn/cooldown.
+        Phụ huynh không cần duyệt lại từng lần đổi quà. Nếu trẻ thiếu điểm, hệ thống sẽ ghi nhận lượt bị chặn và gợi ý trẻ làm thêm nhiệm vụ.
+      </div>
       <div className="overflow-x-auto mt-4 -mx-6 px-6">
         <table className="w-full text-left border-collapse">
           <thead>

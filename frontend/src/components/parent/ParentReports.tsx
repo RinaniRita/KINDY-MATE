@@ -25,6 +25,8 @@ type ReportData = {
     creative_minutes: number;
     entertainment_minutes_today: number;
     documentary_minutes: number;
+    screen_time_minutes: number;
+    total_app_minutes: number;
     mission_completion_count: number;
     blocked_attempts: number;
     cap_left_today: number;
@@ -53,7 +55,18 @@ const missionLabels: Record<string, string> = {
   movement: "Vận động",
   reading: "Đọc",
   reflection: "Nhìn lại",
+  screen_time: "Thời gian dùng app",
 };
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
 export function ParentReports() {
   const [children, setChildren] = useState<ChildProfile[]>([]);
@@ -120,6 +133,19 @@ export function ParentReports() {
     );
   }
 
+  const activeMinutes =
+    report.metrics.learning_minutes +
+    report.metrics.reading_minutes +
+    report.metrics.movement_minutes +
+    report.metrics.creative_minutes;
+  const passiveMinutes = report.metrics.entertainment_minutes_today + report.metrics.documentary_minutes;
+  const totalTracked = Math.max(activeMinutes + passiveMinutes, 1);
+  const activeRatio = Math.round((activeMinutes / totalTracked) * 100);
+  const passiveRatio = Math.round((passiveMinutes / totalTracked) * 100);
+  const averagePointsPerMission = report.metrics.mission_completion_count
+    ? Math.round(report.wallet.points_earned_total / report.metrics.mission_completion_count)
+    : 0;
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <Panel eyebrow="Báo cáo trẻ" title={`Báo cáo của ${report.child.nickname}`}>
@@ -137,9 +163,28 @@ export function ParentReports() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Metric label="Điểm hiện có" value={`${report.wallet.points_balance}`} variant="green" />
+          <Metric label="Tổng thời gian app" value={`${report.metrics.total_app_minutes || 0} phút`} variant="purple" />
           <Metric label="Tổng điểm đã nhận" value={`${report.wallet.points_earned_total}`} variant="blue" />
           <Metric label="Tổng điểm đã dùng" value={`${report.wallet.points_spent_total}`} variant="yellow" />
           <Metric label="Lượt chặn an toàn" value={`${report.metrics.blocked_attempts}`} variant="rose" />
+        </div>
+
+        <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-5">
+          <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Phân tích sâu</p>
+          <div className="mt-3 grid gap-3">
+            <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-700">
+              <span>Tỷ lệ hoạt động chủ động</span>
+              <span>{activeRatio}%</span>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-700">
+              <span>Tỷ lệ giải trí/thụ động</span>
+              <span>{passiveRatio}%</span>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-700">
+              <span>Điểm trung bình mỗi nhiệm vụ</span>
+              <span>{averagePointsPerMission} điểm</span>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 rounded-3xl border border-sky-100 bg-sky-50/70 p-5">
@@ -192,7 +237,10 @@ export function ParentReports() {
             {report.recent_transactions.length ? (
               report.recent_transactions.map((transaction) => (
                 <div className="flex flex-col justify-between gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-slate-700 sm:flex-row" key={transaction.id}>
-                  <span>{transaction.reason}</span>
+                  <span>
+                    {transaction.reason}
+                    <span className="mt-1 block text-xs text-slate-400">{formatDateTime(transaction.created_at)}</span>
+                  </span>
                   <span>{transaction.points > 0 ? "+" : ""}{transaction.points} điểm</span>
                 </div>
               ))

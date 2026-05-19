@@ -10,6 +10,7 @@ class UsageSession(models.Model):
         ENTERTAINMENT = 'entertainment', 'Entertainment'
         DOCUMENTARY = 'documentary', 'Documentary'
         CUSTOMIZATION = 'customization', 'Customization'
+        SCREEN_TIME = 'screen_time', 'Screen time'
         BLOCKED = 'blocked', 'Blocked'
 
     child = models.ForeignKey(
@@ -128,3 +129,42 @@ class ParentAlert(models.Model):
 
     def __str__(self):
         return f'{self.alert_type} for {self.child.nickname}'
+
+
+class ParentOverrideLog(models.Model):
+    """Audit trail for every significant parent action."""
+    class ActionType(models.TextChoices):
+        PIN_CHANGE = 'pin_change', 'PIN changed'
+        PIN_RESET = 'pin_reset', 'PIN reset'
+        RULE_CHANGE = 'rule_change', 'Rule changed'
+        CONTENT_APPROVE = 'content_approve', 'Content approved'
+        CONTENT_BLOCK = 'content_block', 'Content blocked'
+        CHILD_DATA_EXPORT = 'child_data_export', 'Child data exported'
+        CHILD_DATA_DELETE = 'child_data_delete', 'Child data deleted'
+        ENTERTAINMENT_PAUSE = 'entertainment_pause', 'Entertainment paused'
+        ENTERTAINMENT_RESUME = 'entertainment_resume', 'Entertainment resumed'
+        MANUAL_POINT_ADJUST = 'manual_point_adjust', 'Manual point adjustment'
+
+    parent = models.ForeignKey(
+        'authentication.User',
+        on_delete=models.CASCADE,
+        related_name='override_logs',
+    )
+    child = models.ForeignKey(
+        'profiles.ChildProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='override_logs',
+    )
+    action_type = models.CharField(max_length=30, choices=ActionType.choices)
+    description = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.action_type} by {self.parent.username} at {self.created_at}'

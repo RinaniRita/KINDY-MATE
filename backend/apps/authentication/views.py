@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -55,3 +56,16 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response(UserSerializer(user).data)
+
+
+class VerifyParentPinView(APIView):
+    def post(self, request):
+        pin = str(request.data.get('pin', ''))
+        if not request.user.parent_pin_hash:
+            return Response(
+                {'detail': 'Phụ huynh cần thiết lập mã PIN trước khi vào khu trẻ em.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not pin.isdigit() or not check_password(pin, request.user.parent_pin_hash):
+            return Response({'detail': 'Mã PIN chưa đúng.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'ok': True})

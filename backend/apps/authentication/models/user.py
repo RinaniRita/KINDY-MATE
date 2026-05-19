@@ -20,6 +20,7 @@ class User(AbstractUser):
     consent_status = models.BooleanField(default=False)
     consent_timestamp = models.DateTimeField(null=True, blank=True)
     avatar_id = models.CharField(max_length=80, default='parent-mint')
+    parent_pin_hash = models.CharField(max_length=128, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
