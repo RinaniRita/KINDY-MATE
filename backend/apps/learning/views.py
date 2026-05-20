@@ -52,3 +52,5 @@ class MissionViewSet(viewsets.ReadOnlyModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+

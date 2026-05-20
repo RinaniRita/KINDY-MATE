@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { apiGetRequired, apiPost } from "@/lib/api";
 
 import { MascotVisual } from "./MascotVisual";
+import { EnglishAnimalsMission } from "./missions/EnglishAnimalsMission";
+import { MathPicturesMission } from "./missions/MathPicturesMission";
 import type { MissionData } from "./types";
 
 type CompletionResponse = {
@@ -133,7 +135,11 @@ export function MissionDetail({ childId, missionId }: { childId: string; mission
           </div>
 
           <div className="mt-6">
-            {mission.source_content?.content_body ? (
+            {mission.title === "English Animals & Colors" ? (
+              <EnglishAnimalsMission />
+            ) : mission.title === "Phép cộng trừ bằng hình ảnh" ? (
+              <MathPicturesMission />
+            ) : mission.source_content?.content_body ? (
               <div 
                 className="child-article-content prose max-w-none text-slate-700 prose-headings:text-slate-800 prose-p:font-bold prose-p:leading-8 prose-img:rounded-3xl prose-img:shadow-md"
                 dangerouslySetInnerHTML={{ __html: mission.source_content.content_body }}

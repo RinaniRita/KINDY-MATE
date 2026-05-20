@@ -10,3 +10,4 @@ router.register('missions', MissionViewSet, basename='missions')
 urlpatterns = [
     path('', include(router.urls)),
 ]
+

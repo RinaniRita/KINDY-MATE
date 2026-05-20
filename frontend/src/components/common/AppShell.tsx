@@ -37,7 +37,7 @@ function childRouteLabel(pathname: string | null | undefined) {
   if (pathname.includes("/create")) return "Góc vẽ";
   if (pathname.includes("/mascot")) return "Tủ đồ";
   if (pathname.includes("/milo")) return "Milo";
-  if (pathname.includes("/mission/")) return "Khu phát triển";
+  if (pathname.includes("/missions/") || pathname.includes("/mission/")) return "Khu phát triển";
   return "Phòng của con";
 }
 
@@ -291,15 +291,20 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
 
   const themeTag = tone === "child" ? "Khu trẻ em" : tone === "parent" ? "Phụ huynh" : "Kindy-Mate";
 
-  let logoHref = "/";
-  if (tone === "parent") {
-    logoHref = "/parent/dashboard";
-  } else if (tone === "child") {
-    const activeChildId = typeof window !== "undefined" ? window.localStorage.getItem("active_child_id") || "" : "";
-    logoHref = activeChildId ? `/child/${activeChildId}/home` : "/child/select-profile";
-  } else if (typeof window !== "undefined" && readAuthSession()?.access) {
-    logoHref = "/parent/dashboard";
-  }
+  const [logoHref, setLogoHref] = useState("/");
+
+  useEffect(() => {
+    let computedHref = "/";
+    if (tone === "parent") {
+      computedHref = "/parent/dashboard";
+    } else if (tone === "child") {
+      const activeChildId = window.localStorage.getItem("active_child_id") || "";
+      computedHref = activeChildId ? `/child/${activeChildId}/home` : "/child/select-profile";
+    } else if (readAuthSession()?.access) {
+      computedHref = "/parent/dashboard";
+    }
+    setLogoHref(computedHref);
+  }, [tone, childId]);
 
   function openParentGate(mode: PinMode = hasParentPin() ? "verify" : "setup") {
     handleClear();

@@ -174,7 +174,7 @@ export function MissionList({
               {resolvedGroup.items.map((mission, index) => (
                 <Link
                   key={mission.id}
-                  href={`/child/${childId}/mission/${mission.id}`}
+                  href={`/child/${childId}/missions/${mission.id}`}
                   className={`group relative overflow-hidden rounded-[2.2rem] border border-white/82 bg-gradient-to-br ${resolvedGroup.meta.tone} px-5 py-5 shadow-[0_18px_36px_rgba(145,163,179,0.14)] transition hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(145,163,179,0.22)]`}
                 >
                   <div className="absolute inset-x-0 top-0 h-16 bg-white/28" />
