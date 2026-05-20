@@ -64,6 +64,11 @@ export type MissionData = {
   requires_camera: boolean;
   verification_method: string;
   safety_notes: string;
+  source_content?: {
+    id: string;
+    content_body: string;
+    media_url: string;
+  } | null;
 };
 
 export type RewardItemData = {

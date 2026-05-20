@@ -1,7 +1,6 @@
 export type HubHotspot = {
   key: "study" | "watch" | "move" | "create" | "mascot" | "milo";
   hrefKey: "study" | "watch" | "move" | "create" | "mascot" | "milo";
-  title: string;
   caption: string;
   icon: string;
   left: number;
@@ -12,7 +11,6 @@ export const hubHotspots: HubHotspot[] = [
   {
     key: "study",
     hrefKey: "study",
-    title: "Bàn học",
     caption: "Quiz và học tập",
     icon: "✏️",
     left: 19,
@@ -21,7 +19,6 @@ export const hubHotspots: HubHotspot[] = [
   {
     key: "watch",
     hrefKey: "watch",
-    title: "TV",
     caption: "Xem cùng Milo",
     icon: "📺",
     left: 49,
@@ -30,7 +27,6 @@ export const hubHotspots: HubHotspot[] = [
   {
     key: "mascot",
     hrefKey: "mascot",
-    title: "Tủ đồ",
     caption: "Đổi đồ cho Milo",
     icon: "🎒",
     left: 79,
@@ -39,7 +35,6 @@ export const hubHotspots: HubHotspot[] = [
   {
     key: "move",
     hrefKey: "move",
-    title: "Thảm tập",
     caption: "Bài vận động",
     icon: "🤸",
     left: 20,
@@ -48,16 +43,14 @@ export const hubHotspots: HubHotspot[] = [
   {
     key: "create",
     hrefKey: "create",
-    title: "Góc vẽ",
     caption: "Sáng tạo",
-    icon: "🎨",
+    icon: "💡",
     left: 77,
     top: 79,
   },
   {
     key: "milo",
     hrefKey: "milo",
-    title: "Milo",
     caption: "Gợi ý và trò chuyện",
     icon: "✨",
     left: 54,

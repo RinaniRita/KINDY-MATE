@@ -132,17 +132,26 @@ export function MissionDetail({ childId, missionId }: { childId: string; mission
             <p className="mt-4 text-base font-bold leading-8 text-slate-600">{mission.description}</p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {steps.map((step, index) => (
-              <div key={step} className="child-island-card rounded-[1.9rem] px-4 py-5">
-                <div className="relative z-10">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-slate-50 text-sm font-black text-slate-700 shadow-sm">
-                    {index + 1}
+          <div className="mt-6">
+            {mission.source_content?.content_body ? (
+              <div 
+                className="child-article-content prose max-w-none text-slate-700 prose-headings:text-slate-800 prose-p:font-bold prose-p:leading-8 prose-img:rounded-3xl prose-img:shadow-md"
+                dangerouslySetInnerHTML={{ __html: mission.source_content.content_body }}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-3">
+                {steps.map((step, index) => (
+                  <div key={step} className="child-island-card rounded-[1.9rem] px-4 py-5">
+                    <div className="relative z-10">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-slate-50 text-sm font-black text-slate-700 shadow-sm">
+                        {index + 1}
+                      </div>
+                      <p className="mt-4 text-base font-black leading-7 text-slate-800">{step}</p>
+                    </div>
                   </div>
-                  <p className="mt-4 text-base font-black leading-7 text-slate-800">{step}</p>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
           {mission.safety_notes ? (

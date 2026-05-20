@@ -205,7 +205,6 @@ export function ChildHome({ childId }: { childId: string }) {
               <span className="hub-hotspot-ring" />
               <span className="text-3xl">{spot.icon}</span>
             </span>
-            <span className="hub-hotspot-label">{spot.title}</span>
           </Link>
         ))}
 
@@ -232,15 +231,6 @@ export function ChildHome({ childId }: { childId: string }) {
             </div>
           </div>
         </button>
-
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 flex-wrap justify-center gap-2 px-4 md:bottom-6">
-          {hubHotspots.map((spot) => (
-            <span key={spot.key} className="child-mini-badge">
-              <span>{spot.icon}</span>
-              <span>{spot.title}</span>
-            </span>
-          ))}
-        </div>
       </section>
     </div>
   );
