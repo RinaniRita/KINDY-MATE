@@ -10,6 +10,11 @@ export type ChildProfileData = {
   rules: {
     daily_entertainment_cap_minutes: number;
     cooldown_minutes: number;
+    session_duration_limit_minutes: number;
+    total_screen_time_limit_minutes: number;
+    continuous_screen_time_limit_minutes: number;
+    minimum_offscreen_break_minutes: number;
+    time_profile: string;
     voice_enabled: boolean;
     camera_enabled: boolean;
     entertainment_paused: boolean;
@@ -38,8 +43,9 @@ export type ChildDashboardData = {
     reading_minutes: number;
     movement_minutes: number;
     creative_minutes: number;
-    entertainment_minutes_today: number;
-    documentary_minutes: number;
+    discovery_minutes: number;
+    healthy_entertainment_minutes: number;
+    mascot_minutes: number;
     screen_time_minutes: number;
     total_app_minutes: number;
     mission_completion_count: number;
@@ -48,6 +54,28 @@ export type ChildDashboardData = {
   };
   mission_mix: Record<string, number>;
   alerts: string[];
+  current_session: {
+    id: string;
+    status: string;
+    current_session_minutes: number;
+    current_screen_minutes: number;
+    current_continuous_screen_minutes: number;
+    current_offscreen_minutes: number;
+    remaining_session_minutes: number;
+    remaining_screen_minutes: number;
+    remaining_continuous_screen_minutes: number;
+    current_activity_type: string;
+    current_activity_title: string;
+    last_heartbeat_at: string | null;
+  } | null;
+  limit_state: {
+    state: string;
+    break_required: boolean;
+    remaining_session_minutes: number;
+    remaining_screen_minutes: number;
+    remaining_continuous_screen_minutes: number;
+    next_allowed_screen_at: string | null;
+  };
 };
 
 export type MissionData = {

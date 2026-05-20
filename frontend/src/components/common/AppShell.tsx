@@ -2,10 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { PersistentMascot } from "@/components/child/PersistentMascot";
-import { apiPatch, apiPost, type AuthResponse } from "@/lib/api";
+import { apiPatch, apiPost, apiPostWithStatus, type AuthResponse } from "@/lib/api";
+import {
+  clearChildModeSession,
+  isChildModePrompted,
+  markChildPromptSkipped,
+  readChildModeSession,
+  segmentDescriptorForPath,
+  updateChildModeSegment,
+  type LimitState,
+  writeChildModeSession,
+} from "@/lib/child-session";
 import { readAuthSession, updateAuthUser } from "@/lib/auth";
 
 type AppShellProps = {
@@ -27,7 +37,7 @@ function childRouteLabel(pathname: string | null | undefined) {
   if (pathname.includes("/create")) return "Góc vẽ";
   if (pathname.includes("/mascot")) return "Tủ đồ";
   if (pathname.includes("/milo")) return "Milo";
-  if (pathname.includes("/mission/")) return "Nhiệm vụ";
+  if (pathname.includes("/mission/")) return "Khu phát triển";
   return "Phòng của con";
 }
 
@@ -36,10 +46,20 @@ function hasParentPin() {
   return Boolean(readAuthSession()?.user?.pin_configured);
 }
 
+function breakRemainingMinutes(limitState: LimitState | null) {
+  const activeBreak = limitState?.active_break_requirement;
+  if (!activeBreak || !activeBreak.started_at) return 0;
+  const start = new Date(activeBreak.started_at).getTime();
+  const end = start + activeBreak.required_minutes * 60_000;
+  return Math.max(Math.ceil((end - Date.now()) / 60_000), 0);
+}
+
 export function AppShell({ children, nav, subtitle, title, tone = "public", childId }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [showPasscodeModal, setShowPasscodeModal] = useState(() => tone === "child" && !hasParentPin());
   const [pinMode, setPinMode] = useState<PinMode>(() => (tone === "child" && !hasParentPin() ? "setup" : "verify"));
@@ -50,15 +70,24 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   const [pinBusy, setPinBusy] = useState(false);
 
   const [showStartSessionModal, setShowStartSessionModal] = useState(false);
-  const [showEndSessionModal, setShowEndSessionModal] = useState(false);
-  const [sessionMinutes, setSessionMinutes] = useState(0);
+  const [showParentExitModal, setShowParentExitModal] = useState(false);
+  const [showChildEndModal, setShowChildEndModal] = useState(false);
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [limitState, setLimitState] = useState<LimitState | null>(null);
+
+  const isChildTone = tone === "child";
+  const isChildHome = isChildTone && pathname?.endsWith("/home");
+  const isBreakTaskRoute = Boolean(pathname?.includes("/move") || pathname?.includes("/create"));
+  const childHomeHref = childId ? `/child/${childId}/home` : "/child/select-profile";
+  const currentSegmentDescriptor = useMemo(() => segmentDescriptorForPath(pathname), [pathname]);
+  const remainingBreakMinutes = breakRemainingMinutes(limitState);
 
   useEffect(() => {
     if (tone !== "child" || typeof window === "undefined") return;
     if (!pathname?.endsWith("/home")) return;
     const activeChildId = childId || window.localStorage.getItem("active_child_id") || "";
     if (!activeChildId) return;
-    const isActive = sessionStorage.getItem("child_session_active") === "true";
+    const isActive = readChildModeSession()?.childModeSessionId;
     const entryNonce = window.localStorage.getItem("child_entry_nonce") || "";
     const seenEntryNonce = sessionStorage.getItem("child_entry_nonce_seen") || "";
     if (entryNonce && entryNonce !== seenEntryNonce) {
@@ -66,93 +95,191 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
       sessionStorage.setItem("child_entry_nonce_seen", entryNonce);
     }
     if (isActive) return;
-    const isAlreadyPrompted = sessionStorage.getItem("child_session_prompted");
-    if (!isAlreadyPrompted) {
+    if (!isChildModePrompted()) {
       window.setTimeout(() => setShowStartSessionModal(true), 0);
     }
   }, [childId, pathname, tone]);
+
+  useEffect(() => {
+    if (!isChildTone || !childId) return;
+    if (idleStartTimer.current) {
+      clearTimeout(idleStartTimer.current);
+      idleStartTimer.current = null;
+    }
+    const activeSession = readChildModeSession();
+    if (!activeSession?.childModeSessionId || activeSession.childId !== childId) return;
+
+    const descriptor = currentSegmentDescriptor;
+    const segmentKey = `${descriptor.screen_class}:${descriptor.activity_category}:${descriptor.display_category}:${descriptor.activity_title}`;
+
+    async function startSegment(afterSeconds = 0) {
+      const freshSession = readChildModeSession();
+      if (!freshSession?.childModeSessionId || freshSession.childId !== childId) return;
+      if (freshSession.segmentKey === segmentKey) return;
+
+      const response = await apiPostWithStatus<{
+        ok: boolean;
+        usage_session_id?: string | null;
+        limit_state?: LimitState;
+        detail?: string;
+      }>("/activity/segments/start/", {
+        child_id: childId,
+        child_mode_session_id: freshSession.childModeSessionId,
+        screen_class: descriptor.screen_class,
+        activity_category: descriptor.activity_category,
+        display_category: descriptor.display_category,
+        activity_title: descriptor.activity_title,
+        session_type: descriptor.session_type,
+        elapsed_seconds: afterSeconds,
+      });
+
+      const payload = response.data as {
+        usage_session_id?: string | null;
+        limit_state?: LimitState;
+        detail?: string;
+      };
+
+      if (payload.limit_state) {
+        setLimitState(payload.limit_state);
+      }
+      if (!response.ok) {
+        return;
+      }
+
+      updateChildModeSegment(payload.usage_session_id ?? null, segmentKey);
+    }
+
+    if (descriptor.screen_class === "idle_screen") {
+      idleStartTimer.current = setTimeout(() => {
+        void startSegment(30);
+      }, 30_000);
+    } else {
+      void startSegment();
+    }
+
+    return () => {
+      if (idleStartTimer.current) {
+        clearTimeout(idleStartTimer.current);
+        idleStartTimer.current = null;
+      }
+    };
+  }, [childId, currentSegmentDescriptor, isChildTone]);
+
+  useEffect(() => {
+    if (!isChildTone || !childId) return;
+    if (heartbeatTimer.current) {
+      clearInterval(heartbeatTimer.current);
+    }
+
+    async function sendHeartbeat() {
+      const activeSession = readChildModeSession();
+      if (!activeSession?.childModeSessionId || activeSession.childId !== childId) return;
+      const response = await apiPostWithStatus<{
+        ok: boolean;
+        limit_state?: LimitState;
+        detail?: string;
+      }>("/activity/segments/heartbeat/", {
+        child_id: childId,
+        child_mode_session_id: activeSession.childModeSessionId,
+        usage_session_id: activeSession.usageSessionId || null,
+        client_state: "active",
+      });
+      const payload = response.data as { limit_state?: LimitState };
+      if (payload.limit_state) {
+        setLimitState(payload.limit_state);
+      }
+      if (!response.ok && response.status === 400) {
+        clearChildModeSession();
+      }
+    }
+
+    void sendHeartbeat();
+    heartbeatTimer.current = setInterval(() => {
+      void sendHeartbeat();
+    }, 15_000);
+
+    return () => {
+      if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
+    };
+  }, [childId, isChildTone]);
+
+  useEffect(() => {
+    if (!limitState || !isChildTone) return;
+    if (limitState.state === "session_limit_reached" || limitState.state === "ended") {
+      clearChildModeSession();
+      router.push("/child/select-profile");
+    }
+  }, [isChildTone, limitState, router]);
 
   async function handleStartSession() {
     if (typeof window === "undefined") return;
     const activeChildId = childId || window.localStorage.getItem("active_child_id") || "";
     if (!activeChildId) return;
+    setSessionBusy(true);
 
     try {
-      const session = await apiPost<{ ok: boolean; session_id: string }>("/activity/start-session/", {
+      const session = await apiPost<{
+        ok: boolean;
+        child_mode_session_id: string;
+        limit_state: LimitState;
+      }>("/activity/child-session/start/", {
         child_id: activeChildId,
       });
-      sessionStorage.setItem("child_session_prompted", "true");
-      sessionStorage.setItem("child_session_active", "true");
-      sessionStorage.setItem("child_session_start_time", String(Date.now()));
-      sessionStorage.setItem("child_session_id", session.session_id);
-      sessionStorage.setItem("child_id_active", activeChildId);
+      writeChildModeSession({
+        childModeSessionId: session.child_mode_session_id,
+        childId: activeChildId,
+      });
+      setLimitState(session.limit_state);
     } catch {
-      sessionStorage.setItem("child_session_prompted", "true");
-      sessionStorage.setItem("child_session_active", "false");
+      markChildPromptSkipped();
     } finally {
       setShowStartSessionModal(false);
+      setSessionBusy(false);
     }
   }
 
   function handleSkipSession() {
-    if (typeof window === "undefined") return;
-    sessionStorage.setItem("child_session_prompted", "true");
-    sessionStorage.setItem("child_session_active", "false");
-    sessionStorage.removeItem("child_session_id");
-    sessionStorage.removeItem("child_session_start_time");
-    sessionStorage.removeItem("child_id_active");
+    markChildPromptSkipped();
     setShowStartSessionModal(false);
   }
 
-  async function handleSaveSession() {
+  async function endChildMode(target: "select-profile" | "parent-dashboard") {
     if (typeof window === "undefined") return;
-    const activeChildId = sessionStorage.getItem("child_id_active") || window.localStorage.getItem("active_child_id") || "";
-    const sessionId = sessionStorage.getItem("child_session_id") || "";
+    const activeSession = readChildModeSession();
+    const activeChildId = activeSession?.childId || childId || window.localStorage.getItem("active_child_id") || "";
+    setSessionBusy(true);
 
-    if (activeChildId) {
-      try {
-        await apiPost("/activity/stop-session/", {
+    try {
+      if (activeSession?.childModeSessionId && activeChildId) {
+        await apiPost("/activity/child-session/end/", {
           child_id: activeChildId,
-          session_id: sessionId,
+          child_mode_session_id: activeSession.childModeSessionId,
         });
-      } catch {
-        // ignore and continue back to parent area
       }
+    } catch {
+      // keep moving to target even if backend has already closed the session
+    } finally {
+      clearChildModeSession();
+      setShowChildEndModal(false);
+      setShowParentExitModal(false);
+      setSessionBusy(false);
+      router.push(target === "parent-dashboard" ? "/parent/dashboard" : "/child/select-profile");
     }
-
-    sessionStorage.removeItem("child_session_prompted");
-    sessionStorage.removeItem("child_session_active");
-    sessionStorage.removeItem("child_session_start_time");
-    sessionStorage.removeItem("child_session_id");
-    sessionStorage.removeItem("child_id_active");
-    setShowEndSessionModal(false);
-    router.push("/parent/dashboard");
   }
 
-  async function handleDiscardSession() {
-    if (typeof window === "undefined") return;
-    const activeChildId = sessionStorage.getItem("child_id_active") || window.localStorage.getItem("active_child_id") || "";
-    const sessionId = sessionStorage.getItem("child_session_id") || "";
-
-    if (activeChildId) {
-      try {
-        await apiPost("/activity/stop-session/", {
-          child_id: activeChildId,
-          session_id: sessionId,
-          discard: true,
-        });
-      } catch {
-        // ignore and continue back to parent area
-      }
+  async function markBreakTaskDone() {
+    const activeSession = readChildModeSession();
+    if (!activeSession?.childModeSessionId || !activeSession.usageSessionId || !childId) return;
+    const response = await apiPostWithStatus<{ ok: boolean; limit_state?: LimitState }>("/activity/segments/complete/", {
+      child_id: childId,
+      child_mode_session_id: activeSession.childModeSessionId,
+      usage_session_id: activeSession.usageSessionId,
+      completion_kind: "break_task_done",
+    });
+    const payload = response.data as { limit_state?: LimitState; ok?: boolean };
+    if (payload.limit_state) {
+      setLimitState(payload.limit_state);
     }
-
-    sessionStorage.removeItem("child_session_prompted");
-    sessionStorage.removeItem("child_session_active");
-    sessionStorage.removeItem("child_session_start_time");
-    sessionStorage.removeItem("child_session_id");
-    sessionStorage.removeItem("child_id_active");
-    setShowEndSessionModal(false);
-    router.push("/parent/dashboard");
   }
 
   const accentClass =
@@ -220,15 +347,10 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
       handleClear();
       setShowPasscodeModal(false);
 
-      if (typeof window !== "undefined" && sessionStorage.getItem("child_session_active") === "true") {
-        const startTime = Number(sessionStorage.getItem("child_session_start_time"));
-        if (startTime) {
-          setSessionMinutes(Math.max(Math.round((Date.now() - startTime) / 60000), 1));
-          setShowEndSessionModal(true);
-          return;
-        }
+      if (readChildModeSession()?.childModeSessionId) {
+        setShowParentExitModal(true);
+        return;
       }
-
       router.push("/parent/dashboard");
     } catch (err) {
       shakeWithMessage(err instanceof Error ? err.message : "Không thể xác minh mã PIN.");
@@ -297,10 +419,6 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
     return () => window.removeEventListener("keydown", handleKeyboard);
   });
 
-  const isChildTone = tone === "child";
-  const isChildHome = isChildTone && pathname?.endsWith("/home");
-  const childHomeHref = childId ? `/child/${childId}/home` : "/child/select-profile";
-
   return (
     <main className={`min-h-screen pb-16 selection:bg-[#dff6ee] selection:text-slate-800 ${isChildTone ? "bg-gradient-to-b from-[#fff7ea] via-[#eef8ff] to-[#ecfaf3]" : "bg-[#fffdf7]"}`}>
       {!isChildTone ? (
@@ -340,18 +458,29 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
         </header>
       ) : null}
 
-      {isChildTone && !isChildHome ? (
-        <div className="pointer-events-none fixed left-4 top-4 z-30 flex gap-2">
-          <Link
-            href={childHomeHref}
-            className="pointer-events-auto child-mini-badge"
-          >
-            <span>🏠</span>
-            <span>Về phòng</span>
-          </Link>
-          <div className="pointer-events-auto child-mini-badge">
-            <span>{childRouteLabel(pathname)}</span>
+      {isChildTone ? (
+        <div className="pointer-events-none fixed left-4 right-4 top-4 z-30 flex items-start justify-between gap-3">
+          <div className="pointer-events-auto flex gap-2">
+            {!isChildHome ? (
+              <>
+                <Link href={childHomeHref} className="child-mini-badge">
+                  <span>🏠</span>
+                  <span>Về phòng</span>
+                </Link>
+                <div className="child-mini-badge">
+                  <span>{childRouteLabel(pathname)}</span>
+                </div>
+              </>
+            ) : null}
           </div>
+          <button
+            type="button"
+            onClick={() => setShowChildEndModal(true)}
+            className="pointer-events-auto child-mini-badge bg-white/92"
+          >
+            <span>🌙</span>
+            <span>Xong rồi</span>
+          </button>
         </div>
       ) : null}
 
@@ -460,15 +589,16 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
             </div>
             <h3 className="text-xl font-black text-slate-800">Bắt đầu tính giờ sử dụng?</h3>
             <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
-              Nếu phụ huynh đồng ý, hệ thống sẽ bắt đầu ghi nhận thời gian dùng app của trẻ theo thời gian thực và lưu lên dashboard.
+              Nếu phụ huynh đồng ý, hệ thống sẽ bắt đầu theo dõi phiên child mode, screen time và thời gian nghỉ ngoài màn hình theo thời gian thực.
             </p>
             <div className="mt-6 flex flex-col gap-2">
               <button
                 type="button"
                 onClick={handleStartSession}
+                disabled={sessionBusy}
                 className="w-full rounded-[1.25rem] bg-[#9dd9c6] py-3 text-xs font-black text-slate-800 shadow-md"
               >
-                Bắt đầu theo dõi
+                {sessionBusy ? "Đang bắt đầu..." : "Bắt đầu theo dõi"}
               </button>
               <button
                 type="button"
@@ -482,33 +612,98 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
         </div>
       ) : null}
 
-      {showEndSessionModal ? (
+      {showChildEndModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] border border-white/40 bg-white p-8 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-[#fff7ea] text-3xl font-black text-slate-700">
+              🌙
+            </div>
+            <h3 className="text-xl font-black text-slate-800">Kết thúc phiên của cậu?</h3>
+            <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
+              App sẽ lưu thời gian của phiên này rồi quay về màn hình chọn hồ sơ trẻ.
+            </p>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={sessionBusy}
+                onClick={() => void endChildMode("select-profile")}
+                className="w-full rounded-[1.25rem] bg-[#91d0f6] py-3 text-xs font-black text-slate-800 shadow-md"
+              >
+                {sessionBusy ? "Đang kết thúc..." : "Kết thúc phiên"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowChildEndModal(false)}
+                className="w-full rounded-[1.25rem] border border-slate-200 bg-white py-3 text-xs font-black text-slate-600"
+              >
+                Chơi thêm một chút
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showParentExitModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] border border-white/40 bg-white p-8 text-center shadow-2xl">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-[#f3fbff] text-3xl font-black text-slate-700">
               KM
             </div>
-            <h3 className="text-xl font-black text-slate-800">Kết thúc phiên sử dụng của trẻ?</h3>
+            <h3 className="text-xl font-black text-slate-800">Vào khu phụ huynh?</h3>
             <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
-              Phiên này hiện đã kéo dài khoảng <span className="text-sm font-black text-slate-800">{sessionMinutes} phút</span>.
-              Phụ huynh có thể lưu để cộng vào dashboard hoặc bỏ qua nếu không muốn tính thời gian này.
+              Hệ thống sẽ kết thúc child mode hiện tại, lưu thời gian dùng app và mở khu phụ huynh.
             </p>
             <div className="mt-6 flex flex-col gap-2">
               <button
                 type="button"
-                onClick={handleSaveSession}
+                disabled={sessionBusy}
+                onClick={() => void endChildMode("parent-dashboard")}
                 className="w-full rounded-[1.25rem] bg-[#91d0f6] py-3 text-xs font-black text-slate-800 shadow-md"
               >
-                Lưu và quay về khu phụ huynh
+                {sessionBusy ? "Đang mở..." : "Kết thúc và vào khu phụ huynh"}
               </button>
               <button
                 type="button"
-                onClick={handleDiscardSession}
+                onClick={() => setShowParentExitModal(false)}
                 className="w-full rounded-[1.25rem] border border-slate-200 bg-white py-3 text-xs font-black text-slate-600"
               >
-                Quay về nhưng không lưu
+                Tiếp tục child mode
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isChildTone && limitState && (limitState.state === "break_required" || limitState.state === "offscreen_only") ? (
+        <div className="fixed inset-x-4 bottom-20 z-40 mx-auto max-w-lg rounded-[2rem] border border-white/80 bg-white/95 p-5 shadow-2xl backdrop-blur">
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+            {limitState.state === "break_required" ? "Nghỉ màn hình" : "Chỉ còn hoạt động ngoài màn hình"}
+          </p>
+          <h3 className="mt-2 text-xl font-black text-slate-800">
+            {limitState.state === "break_required"
+              ? "Đến lúc cho mắt nghỉ một chút."
+              : "Phiên này đã hết screen time."}
+          </h3>
+          <p className="mt-2 text-sm font-bold leading-7 text-slate-600">
+            {limitState.state === "break_required"
+              ? `Cậu cần nghỉ thêm ${remainingBreakMinutes} phút và hoàn thành một việc ngoài màn hình trước khi quay lại hoạt động trên app.`
+              : "Cậu vẫn có thể sang thảm tập hoặc góc vẽ để tiếp tục phiên này mà không cần thêm màn hình."}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href={childId ? `/child/${childId}/move` : "/child/select-profile"} className="child-mini-badge bg-[#eef8ff]">
+              <span>🤸</span>
+              <span>Thảm tập</span>
+            </Link>
+            <Link href={childId ? `/child/${childId}/create` : "/child/select-profile"} className="child-mini-badge bg-[#fff7ea]">
+              <span>🎨</span>
+              <span>Góc vẽ</span>
+            </Link>
+            {isBreakTaskRoute ? (
+              <button type="button" onClick={() => void markBreakTaskDone()} className="child-mini-badge bg-[#f3fbf7]">
+                <span>✅</span>
+                <span>Tớ đã nghỉ xong</span>
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

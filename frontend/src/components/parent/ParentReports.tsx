@@ -23,8 +23,8 @@ type ReportData = {
     reading_minutes: number;
     movement_minutes: number;
     creative_minutes: number;
-    entertainment_minutes_today: number;
-    documentary_minutes: number;
+    discovery_minutes: number;
+    healthy_entertainment_minutes: number;
     screen_time_minutes: number;
     total_app_minutes: number;
     mission_completion_count: number;
@@ -130,7 +130,7 @@ export function ParentReports() {
       report.metrics.reading_minutes +
       report.metrics.movement_minutes +
       report.metrics.creative_minutes;
-    const passiveMinutes = report.metrics.entertainment_minutes_today + report.metrics.documentary_minutes;
+    const passiveMinutes = report.metrics.healthy_entertainment_minutes + report.metrics.discovery_minutes;
     const totalTracked = Math.max(activeMinutes + passiveMinutes, 1);
     return {
       activeMinutes,

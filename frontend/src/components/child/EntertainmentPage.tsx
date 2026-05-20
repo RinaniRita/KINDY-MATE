@@ -66,7 +66,7 @@ export function EntertainmentPage({
         setLoading(false);
       }
     }
-    load().catch(() => setLoading(false));
+    void load().catch(() => setLoading(false));
   }, [childId]);
 
   const filteredRewards = useMemo(() => {
@@ -143,7 +143,9 @@ export function EntertainmentPage({
 
             <div className="mt-5 flex flex-wrap gap-2">
               <span className="child-mini-badge">⭐ {walletBalance} điểm</span>
-              <span className="child-mini-badge">🎬 {dashboard?.metrics.entertainment_minutes_today ?? 0} phút hôm nay</span>
+              <span className="child-mini-badge">
+                🎬 {(dashboard?.metrics.healthy_entertainment_minutes ?? 0) + (dashboard?.metrics.discovery_minutes ?? 0)} phút hôm nay
+              </span>
               <span className="child-mini-badge">⏱️ {dashboard?.metrics.cap_left_today ?? 0} phút còn lại</span>
             </div>
           </div>
@@ -211,9 +213,7 @@ export function EntertainmentPage({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <span className="child-mini-badge">
-                  {child.rules.entertainment_paused ? "⏸️ Tạm dừng" : "✅ Đang mở"}
-                </span>
+                <span className="child-mini-badge">{child.rules.entertainment_paused ? "⏸️ Tạm dừng" : "✅ Đang mở"}</span>
                 <span className="child-mini-badge">🕒 Cooldown {child.rules.cooldown_minutes} phút</span>
               </div>
             </div>

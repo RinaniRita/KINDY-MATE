@@ -47,6 +47,23 @@ def complete_mission_for_child(child, mission, score=100):
     UsageSession.objects.create(
         child=child,
         session_type=mission.mission_type,
+        status=UsageSession.Status.COMPLETED,
+        screen_class=(
+            UsageSession.ScreenClass.OFFSCREEN_TASK
+            if mission.mission_type in ['movement', 'creative']
+            else UsageSession.ScreenClass.SCREEN_LEARNING
+        ),
+        screen_based=mission.mission_type not in ['movement', 'creative'],
+        activity_category=(
+            'movement'
+            if mission.mission_type == 'movement'
+            else 'creativity'
+            if mission.mission_type == 'creative'
+            else 'reading'
+            if mission.mission_type == 'reading'
+            else 'learning'
+        ),
+        display_category=mission.display_category,
         content=mission.source_content,
         duration_minutes=mission.estimated_duration_minutes,
         notes='Mission completed through guided flow.',

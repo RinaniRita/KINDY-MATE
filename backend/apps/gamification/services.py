@@ -5,6 +5,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from apps.activity_logger.models import ActivityLog, EntertainmentSession, ParentAlert, UsageSession
+from apps.activity_logger.services import current_limit_state
 from apps.learning.models import ContentItem, MissionAttempt
 
 from .models import RewardTransaction
@@ -65,6 +66,13 @@ def check_reward_access(child, reward_item):
         return False, 'not_enough_points'
     if is_timed and reward_item.duration_minutes > max(rules.daily_entertainment_cap_minutes - entertainment_minutes_today(child), 0):
         return False, 'daily_cap_reached'
+    active_child_session = child.child_mode_sessions.filter(status='active').order_by('-started_at').first()
+    if is_timed and active_child_session:
+        limit_state = current_limit_state(active_child_session)
+        if limit_state['state'] == 'break_required':
+            return False, 'cooldown_active'
+        if limit_state['remaining_screen_minutes'] <= 0:
+            return False, 'daily_cap_reached'
     if is_timed and rules.cooldown_minutes:
         recent_cutoff = timezone.now() - timedelta(minutes=rules.cooldown_minutes)
         if EntertainmentSession.objects.filter(child=child, started_at__gte=recent_cutoff).exists():
@@ -144,6 +152,23 @@ def spend_reward_for_child(child, reward_item):
     usage_session = UsageSession.objects.create(
         child=child,
         session_type=reward_item.reward_type,
+        status=UsageSession.Status.COMPLETED,
+        screen_class=(
+            UsageSession.ScreenClass.SCREEN_DISCOVERY
+            if reward_item.reward_type == reward_item.RewardType.DOCUMENTARY
+            else UsageSession.ScreenClass.SCREEN_MASCOT
+            if reward_item.reward_type == reward_item.RewardType.MASCOT_ITEM
+            else UsageSession.ScreenClass.SCREEN_HEALTHY_ENTERTAINMENT
+        ),
+        screen_based=True,
+        activity_category=(
+            'discovery'
+            if reward_item.reward_type == reward_item.RewardType.DOCUMENTARY
+            else 'mascot'
+            if reward_item.reward_type == reward_item.RewardType.MASCOT_ITEM
+            else 'healthy_entertainment'
+        ),
+        display_category=reward_item.display_category,
         content=content,
         duration_minutes=reward_item.duration_minutes,
         points_spent=reward_item.points_cost,

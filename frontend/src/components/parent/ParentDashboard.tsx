@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 import { Metric, Panel } from "@/components/common/Cards";
 import { apiGet, apiGetRequired } from "@/lib/api";
@@ -25,14 +25,20 @@ type DashboardData = {
     entertainment_paused: boolean;
     voice_enabled: boolean;
     camera_enabled: boolean;
+    session_duration_limit_minutes: number;
+    total_screen_time_limit_minutes: number;
+    continuous_screen_time_limit_minutes: number;
+    minimum_offscreen_break_minutes: number;
+    time_profile: string;
   };
   metrics: {
     learning_minutes: number;
     reading_minutes: number;
     movement_minutes: number;
     creative_minutes: number;
-    entertainment_minutes_today: number;
-    documentary_minutes: number;
+    discovery_minutes: number;
+    healthy_entertainment_minutes: number;
+    mascot_minutes: number;
     screen_time_minutes: number;
     total_app_minutes: number;
     mission_completion_count: number;
@@ -49,6 +55,38 @@ type DashboardData = {
     reason: string;
     created_at: string;
   }>;
+  current_session: {
+    id: string;
+    status: string;
+    current_session_minutes: number;
+    current_screen_minutes: number;
+    current_continuous_screen_minutes: number;
+    current_offscreen_minutes: number;
+    remaining_session_minutes: number;
+    remaining_screen_minutes: number;
+    remaining_continuous_screen_minutes: number;
+    current_activity_type: string;
+    current_activity_title: string;
+    last_heartbeat_at: string | null;
+  } | null;
+  limit_state: {
+    state: string;
+    break_required: boolean;
+    remaining_session_minutes: number;
+    remaining_screen_minutes: number;
+    remaining_continuous_screen_minutes: number;
+    active_break_requirement: {
+      status: string;
+      required_minutes: number;
+      started_at: string;
+      timer_completed_at: string | null;
+      task_completed_at: string | null;
+    } | null;
+    current_activity_type: string;
+    current_activity_title: string;
+    session_status: string;
+    last_heartbeat_at: string | null;
+  };
 };
 
 type HourlyData = {
@@ -58,18 +96,17 @@ type HourlyData = {
   breakdown: Record<string, number>;
 };
 
-/* ───── Hourly Usage Chart (pure CSS) ───── */
 function UsageChart({ data }: { data: HourlyData[] }) {
   const maxVal = Math.max(...data.map((d) => d.total_minutes), 1);
 
   return (
     <div className="mt-4">
-      <div className="flex items-end gap-[2px] h-32">
-        {data.map((h) => {
-          const height = (h.total_minutes / maxVal) * 100;
-          const hasData = h.total_minutes > 0;
+      <div className="flex h-32 items-end gap-[2px]">
+        {data.map((hour) => {
+          const height = (hour.total_minutes / maxVal) * 100;
+          const hasData = hour.total_minutes > 0;
           return (
-            <div key={h.hour} className="relative flex-1 group" title={`${h.label}: ${h.total_minutes} phút`}>
+            <div key={hour.hour} className="group relative flex-1" title={`${hour.label}: ${hour.total_minutes} phút`}>
               <div
                 className={`w-full rounded-t transition-all duration-500 ${
                   hasData
@@ -78,20 +115,19 @@ function UsageChart({ data }: { data: HourlyData[] }) {
                 }`}
                 style={{ height: `${Math.max(height, 3)}%` }}
               />
-              {/* Tooltip */}
-              {hasData && (
-                <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap pointer-events-none z-10">
-                  {h.total_minutes}p
+              {hasData ? (
+                <div className="pointer-events-none absolute -top-10 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-slate-800 px-2 py-1 text-[9px] font-bold whitespace-nowrap text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  {hour.total_minutes}p
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
       </div>
-      <div className="flex gap-[2px] mt-1">
-        {data.map((h) => (
-          <div key={h.hour} className="flex-1 text-center text-[8px] font-bold text-slate-400">
-            {h.hour % 3 === 0 ? h.label.slice(0, 2) : ""}
+      <div className="mt-1 flex gap-[2px]">
+        {data.map((hour) => (
+          <div key={hour.hour} className="flex-1 text-center text-[8px] font-bold text-slate-400">
+            {hour.hour % 3 === 0 ? hour.label.slice(0, 2) : ""}
           </div>
         ))}
       </div>
@@ -99,34 +135,33 @@ function UsageChart({ data }: { data: HourlyData[] }) {
   );
 }
 
-/* ───── Mission Mix Bar ───── */
 function MissionMixBar({ mix }: { mix: Record<string, number> }) {
   const labels: Record<string, { label: string; color: string }> = {
     learning: { label: "Học", color: "bg-emerald-400" },
     reading: { label: "Đọc", color: "bg-blue-400" },
     movement: { label: "Vận động", color: "bg-amber-400" },
     creative: { label: "Sáng tạo", color: "bg-violet-400" },
-    reflection: { label: "Suy ngẫm", color: "bg-pink-400" },
+    reflection: { label: "Kỹ năng sống", color: "bg-pink-400" },
   };
-  const total = Object.values(mix).reduce((a, b) => a + b, 0) || 1;
+  const total = Object.values(mix).reduce((sum, value) => sum + value, 0) || 1;
 
   return (
     <div>
-      <div className="flex h-4 rounded-full overflow-hidden bg-slate-100">
-        {Object.entries(mix).map(([key, val]) => (
+      <div className="flex h-4 overflow-hidden rounded-full bg-slate-100">
+        {Object.entries(mix).map(([key, value]) => (
           <div
             key={key}
             className={`${labels[key]?.color || "bg-slate-300"} transition-all duration-500`}
-            style={{ width: `${(val / total) * 100}%` }}
-            title={`${labels[key]?.label || key}: ${val}`}
+            style={{ width: `${(value / total) * 100}%` }}
+            title={`${labels[key]?.label || key}: ${value}`}
           />
         ))}
       </div>
-      <div className="flex flex-wrap gap-3 mt-2">
-        {Object.entries(mix).map(([key, val]) => (
+      <div className="mt-2 flex flex-wrap gap-3">
+        {Object.entries(mix).map(([key, value]) => (
           <span key={key} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
             <span className={`inline-block h-2 w-2 rounded-full ${labels[key]?.color || "bg-slate-300"}`} />
-            {labels[key]?.label || key}: {val}
+            {labels[key]?.label || key}: {value}
           </span>
         ))}
       </div>
@@ -134,7 +169,17 @@ function MissionMixBar({ mix }: { mix: Record<string, number> }) {
   );
 }
 
-/* ───── Main Dashboard ───── */
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function ParentDashboard() {
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
@@ -150,8 +195,7 @@ export function ParentDashboard() {
       try {
         const data = await apiGetRequired<ChildProfile[]>("/children/");
         setChildren(data);
-        const activeChildId =
-          typeof window !== "undefined" ? window.localStorage.getItem("active_child_id") : "";
+        const activeChildId = typeof window !== "undefined" ? window.localStorage.getItem("active_child_id") : "";
         const nextChildId = data.find((child) => child.id === activeChildId)?.id ?? data[0]?.id ?? "";
         setSelectedChildId(nextChildId);
         if (!nextChildId) setLoading(false);
@@ -160,7 +204,7 @@ export function ParentDashboard() {
         setLoading(false);
       }
     }
-    loadChildren();
+    void loadChildren();
   }, []);
 
   useEffect(() => {
@@ -185,13 +229,14 @@ export function ParentDashboard() {
         setLoading(false);
       }
     }
-    loadDashboard();
+    void loadDashboard();
   }, [selectedChildId]);
 
   const capPercent = useMemo(() => {
     if (!dashboard) return 0;
     const cap = dashboard.rules.daily_entertainment_cap_minutes || 1;
-    return Math.min((dashboard.metrics.entertainment_minutes_today / cap) * 100, 100);
+    const used = dashboard.metrics.discovery_minutes + dashboard.metrics.healthy_entertainment_minutes;
+    return Math.min((used / cap) * 100, 100);
   }, [dashboard]);
 
   if (loading) {
@@ -235,7 +280,6 @@ export function ParentDashboard() {
 
   return (
     <div className="grid gap-6 py-4">
-      {/* ─── Row 1: Child Selector + Quick Stats ─── */}
       <div className="flex flex-wrap items-center gap-3">
         <select
           className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 outline-none focus:border-emerald-400"
@@ -263,20 +307,20 @@ export function ParentDashboard() {
         </Link>
       </div>
 
-      {/* ─── Row 2: Main Grid ─── */}
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        {/* LEFT: Activity metrics + chart */}
         <div className="grid gap-6">
-          <Panel eyebrow={`📊 Cân bằng phát triển`} title="Hoạt động trong ngày">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-2">
-              <Metric label="Tổng thời gian app" value={`${dashboard.metrics.total_app_minutes || 0} phút`} variant="purple" />
+          <Panel eyebrow="📊 Cân bằng phát triển" title="Hoạt động trong ngày">
+            <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric label="Tổng thời gian app" value={`${dashboard.metrics.total_app_minutes} phút`} variant="purple" />
               <Metric label="📚 Học tập" value={`${dashboard.metrics.learning_minutes} phút`} variant="green" />
               <Metric label="📖 Đọc sách" value={`${dashboard.metrics.reading_minutes} phút`} variant="blue" />
               <Metric label="🏃 Vận động" value={`${dashboard.metrics.movement_minutes} phút`} variant="yellow" />
-              <Metric label="🎨 Sáng tạo" value={`${dashboard.metrics.creative_minutes || 0} phút`} variant="purple" />
+              <Metric label="🎨 Sáng tạo" value={`${dashboard.metrics.creative_minutes} phút`} variant="purple" />
+              <Metric label="🔬 Khám phá" value={`${dashboard.metrics.discovery_minutes} phút`} variant="blue" />
+              <Metric label="🎮 Giải trí lành mạnh" value={`${dashboard.metrics.healthy_entertainment_minutes} phút`} variant="yellow" />
+              <Metric label="🧸 Mascot" value={`${dashboard.metrics.mascot_minutes} phút`} variant="green" />
             </div>
 
-            {/* Entertainment cap bar */}
             <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-5">
               <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500">
                 <span>🎮 Hạn mức giải trí hôm nay</span>
@@ -291,33 +335,60 @@ export function ParentDashboard() {
                 />
               </div>
               <p className="mt-2 text-[11px] font-bold text-slate-400">
-                {dashboard.metrics.entertainment_minutes_today}/{dashboard.rules.daily_entertainment_cap_minutes} phút ·{" "}
-                Còn {dashboard.metrics.cap_left_today} phút ·{" "}
-                Tạm dừng: {dashboard.rules.entertainment_paused ? "🔴 Bật" : "🟢 Tắt"}
+                Còn {dashboard.metrics.cap_left_today} phút trong hạn mức ngày · Tạm dừng:{" "}
+                {dashboard.rules.entertainment_paused ? "🔴 Bật" : "🟢 Tắt"}
               </p>
             </div>
           </Panel>
 
-          {/* Hourly usage chart */}
           <Panel eyebrow="⏰ Biểu đồ sử dụng" title="Thời gian hoạt động theo giờ trong ngày">
             {hourlyData.some((hour) => hour.total_minutes > 0) ? (
               <UsageChart data={hourlyData} />
             ) : (
               <p className="py-6 text-center text-xs font-bold text-slate-400">Chưa có dữ liệu sử dụng hôm nay.</p>
             )}
-            <p className="mt-3 text-[10px] font-bold text-slate-400 text-center">
-              Biểu đồ hiển thị tổng số phút hoạt động mỗi giờ trong ngày hôm nay.
-            </p>
+          </Panel>
+
+          <Panel eyebrow="🧭 Phiên hiện tại" title="Theo dõi realtime child mode">
+            {dashboard.current_session ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Metric label="Tổng phiên hiện tại" value={`${dashboard.current_session.current_session_minutes} phút`} variant="purple" />
+                <Metric label="Screen time hiện tại" value={`${dashboard.current_session.current_screen_minutes} phút`} variant="blue" />
+                <Metric label="Liên tục hiện tại" value={`${dashboard.current_session.current_continuous_screen_minutes} phút`} variant="yellow" />
+                <Metric label="Ngoài màn hình" value={`${dashboard.current_session.current_offscreen_minutes} phút`} variant="green" />
+                <Metric label="Còn lại của phiên" value={`${dashboard.current_session.remaining_session_minutes} phút`} variant="green" />
+                <Metric label="Còn lại screen time" value={`${dashboard.current_session.remaining_screen_minutes} phút`} variant="blue" />
+                <Metric label="Còn trước khi phải nghỉ" value={`${dashboard.current_session.remaining_continuous_screen_minutes} phút`} variant="yellow" />
+                <Metric label="Trạng thái" value={dashboard.limit_state.state} variant="purple" />
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-slate-500">Hiện chưa có phiên child mode nào đang mở.</p>
+            )}
+
+            {dashboard.current_session ? (
+              <div className="mt-4 rounded-2xl border border-[#dff6ee] bg-[#f3fbf7] p-4 text-sm font-bold leading-7 text-slate-700">
+                Đang ở: <strong>{dashboard.limit_state.current_activity_title || "—"}</strong> · Loại hoạt động:{" "}
+                <strong>{dashboard.limit_state.current_activity_type || "—"}</strong> · Heartbeat gần nhất:{" "}
+                <strong>{formatDateTime(dashboard.limit_state.last_heartbeat_at)}</strong>
+              </div>
+            ) : null}
+
+            {dashboard.limit_state.active_break_requirement ? (
+              <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-bold leading-7 text-slate-700">
+                Break đang mở · Yêu cầu nghỉ {dashboard.limit_state.active_break_requirement.required_minutes} phút · Timer xong:{" "}
+                {dashboard.limit_state.active_break_requirement.timer_completed_at ? "Đã đủ" : "Chưa"} · Task xong:{" "}
+                {dashboard.limit_state.active_break_requirement.task_completed_at ? "Đã xong" : "Chưa"}
+              </div>
+            ) : null}
           </Panel>
         </div>
 
-        {/* RIGHT: Alerts + Mission Mix + Transactions */}
-        <div className="grid gap-6 content-start">
+        <div className="grid content-start gap-6">
           <Panel eyebrow="🛡️ An toàn" title="Gợi ý cho phụ huynh">
             <div className="space-y-2">
               {dashboard.alerts.length ? (
-                dashboard.alerts.map((alert, i) => (
-                  <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-bold leading-relaxed text-slate-700" key={i}>
+                dashboard.alerts.map((alert, index) => (
+                  <div key={index} className="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-bold leading-relaxed text-slate-700">
                     {alert}
                   </div>
                 ))
@@ -339,38 +410,29 @@ export function ParentDashboard() {
             </div>
           </Panel>
 
-          {/* Recent transactions */}
-          {dashboard.recent_transactions.length > 0 && (
+          {dashboard.recent_transactions.length > 0 ? (
             <Panel eyebrow="💎 Giao dịch gần đây" title="Lịch sử điểm thưởng">
-              <div className="space-y-2 mt-2">
-                {dashboard.recent_transactions.slice(0, 5).map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3">
+              <div className="mt-2 space-y-2">
+                {dashboard.recent_transactions.slice(0, 5).map((transaction) => (
+                  <div key={transaction.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3">
                     <div>
-                      <span className="block text-xs font-black text-slate-700">{tx.reason}</span>
-                      <span className="text-[10px] font-bold text-slate-400">
-                        {new Date(tx.created_at).toLocaleString("vi-VN", {
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}
-                      </span>
+                      <span className="block text-xs font-black text-slate-700">{transaction.reason}</span>
+                      <span className="text-[10px] font-bold text-slate-400">{formatDateTime(transaction.created_at)}</span>
                     </div>
                     <span
                       className={`text-xs font-black ${
-                        tx.type === "earn" ? "text-emerald-600" : tx.type === "spend" ? "text-rose-500" : "text-slate-500"
+                        transaction.type === "earn" ? "text-emerald-600" : transaction.type === "spend" ? "text-rose-500" : "text-slate-500"
                       }`}
                     >
-                      {tx.type === "earn" ? "+" : tx.type === "spend" ? "-" : ""}{tx.points}
+                      {transaction.type === "earn" ? "+" : transaction.type === "spend" ? "-" : ""}
+                      {transaction.points}
                     </span>
                   </div>
                 ))}
               </div>
             </Panel>
-          )}
+          ) : null}
 
-          {/* Weekly summary */}
           <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-5">
             <p className="text-xs font-black uppercase tracking-wider text-amber-700">📈 Tóm tắt tuần</p>
             <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-700">{dashboard.weekly_summary}</p>
