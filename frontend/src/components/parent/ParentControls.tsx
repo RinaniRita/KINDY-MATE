@@ -15,7 +15,6 @@ type ChildProfileData = {
   interests: string;
   favorite_subjects: string;
   default_language: string;
-  wallet_balance: number;
 };
 
 function childEmoji(avatarId: string) {
@@ -89,7 +88,7 @@ export function ChildrenManager() {
                   {child.interests ? `Sở thích: ${child.interests}` : "Chưa thêm sở thích"}
                 </p>
                 <p className="text-xs font-bold text-slate-400">
-                  Ví {child.wallet_balance} điểm · {child.default_language.toUpperCase()}
+                  {child.default_language.toUpperCase()}
                 </p>
               </div>
             </div>

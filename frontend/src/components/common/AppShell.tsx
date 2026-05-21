@@ -61,8 +61,8 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   const idleStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [showPasscodeModal, setShowPasscodeModal] = useState(() => tone === "child" && !hasParentPin());
-  const [pinMode, setPinMode] = useState<PinMode>(() => (tone === "child" && !hasParentPin() ? "setup" : "verify"));
+  const [showPasscodeModal, setShowPasscodeModal] = useState(false);
+  const [pinMode, setPinMode] = useState<PinMode>("verify");
   const [pin, setPin] = useState("");
   const [setupDraft, setSetupDraft] = useState("");
   const [pinError, setPinError] = useState("");
@@ -74,6 +74,13 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   const [showChildEndModal, setShowChildEndModal] = useState(false);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [limitState, setLimitState] = useState<LimitState | null>(null);
+
+  useEffect(() => {
+    if (tone === "child" && !hasParentPin()) {
+      setShowPasscodeModal(true);
+      setPinMode("setup");
+    }
+  }, [tone]);
 
   const isChildTone = tone === "child";
   const isChildHome = isChildTone && pathname?.endsWith("/home");

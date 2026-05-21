@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Metric, Panel } from "@/components/common/Cards";
 import { apiGet, apiGetRequired } from "@/lib/api";
-import { triggerChildEntry } from "@/lib/parent-actions";
 
 type ChildProfile = {
   id: string;
@@ -13,16 +12,32 @@ type ChildProfile = {
   age: number;
 };
 
+type BreakdownItem = {
+  key: string;
+  label: string;
+  minutes: number;
+  count: number;
+  share: number;
+  screen_based: boolean;
+};
+
+type SessionItem = {
+  id: string;
+  session_type: string;
+  content_title?: string;
+  status: string;
+  activity_category: string;
+  display_category: string;
+  duration_minutes: number;
+  notes: string;
+  started_at: string;
+  ended_at?: string | null;
+};
+
 type DashboardData = {
   child: ChildProfile;
-  wallet: {
-    points_balance: number;
-    points_earned_total: number;
-    points_spent_total: number;
-  };
+  report_date: string;
   rules: {
-    daily_entertainment_cap_minutes: number;
-    entertainment_paused: boolean;
     voice_enabled: boolean;
     camera_enabled: boolean;
     session_duration_limit_minutes: number;
@@ -36,25 +51,37 @@ type DashboardData = {
     reading_minutes: number;
     movement_minutes: number;
     creative_minutes: number;
+    life_skill_minutes: number;
     discovery_minutes: number;
     healthy_entertainment_minutes: number;
     mascot_minutes: number;
+    break_minutes: number;
+    idle_minutes: number;
     screen_time_minutes: number;
+    offscreen_time_minutes: number;
     total_app_minutes: number;
-    mission_completion_count: number;
-    blocked_attempts: number;
-    cap_left_today: number;
+    completed_activity_count: number;
+    active_minutes: number;
+    passive_minutes: number;
   };
-  mission_mix: Record<string, number>;
+  comparisons: {
+    active_vs_passive: {
+      active_minutes: number;
+      passive_minutes: number;
+      active_ratio: number;
+      passive_ratio: number;
+    };
+    screen_vs_offscreen: {
+      screen_minutes: number;
+      offscreen_minutes: number;
+      screen_ratio: number;
+      offscreen_ratio: number;
+    };
+  };
+  today_breakdown: BreakdownItem[];
   alerts: string[];
   weekly_summary: string;
-  recent_transactions: Array<{
-    id: string;
-    type: string;
-    points: number;
-    reason: string;
-    created_at: string;
-  }>;
+  recent_sessions: SessionItem[];
   current_session: {
     id: string;
     status: string;
@@ -67,26 +94,9 @@ type DashboardData = {
     remaining_continuous_screen_minutes: number;
     current_activity_type: string;
     current_activity_title: string;
+    current_segment_started_at: string | null;
     last_heartbeat_at: string | null;
   } | null;
-  limit_state: {
-    state: string;
-    break_required: boolean;
-    remaining_session_minutes: number;
-    remaining_screen_minutes: number;
-    remaining_continuous_screen_minutes: number;
-    active_break_requirement: {
-      status: string;
-      required_minutes: number;
-      started_at: string;
-      timer_completed_at: string | null;
-      task_completed_at: string | null;
-    } | null;
-    current_activity_type: string;
-    current_activity_title: string;
-    session_status: string;
-    last_heartbeat_at: string | null;
-  };
 };
 
 type HourlyData = {
@@ -95,79 +105,6 @@ type HourlyData = {
   total_minutes: number;
   breakdown: Record<string, number>;
 };
-
-function UsageChart({ data }: { data: HourlyData[] }) {
-  const maxVal = Math.max(...data.map((d) => d.total_minutes), 1);
-
-  return (
-    <div className="mt-4">
-      <div className="flex h-32 items-end gap-[2px]">
-        {data.map((hour) => {
-          const height = (hour.total_minutes / maxVal) * 100;
-          const hasData = hour.total_minutes > 0;
-          return (
-            <div key={hour.hour} className="group relative flex-1" title={`${hour.label}: ${hour.total_minutes} phút`}>
-              <div
-                className={`w-full rounded-t transition-all duration-500 ${
-                  hasData
-                    ? "bg-gradient-to-t from-emerald-400 to-teal-300 group-hover:from-emerald-500 group-hover:to-teal-400"
-                    : "bg-slate-100"
-                }`}
-                style={{ height: `${Math.max(height, 3)}%` }}
-              />
-              {hasData ? (
-                <div className="pointer-events-none absolute -top-10 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-slate-800 px-2 py-1 text-[9px] font-bold whitespace-nowrap text-white opacity-0 transition-opacity group-hover:opacity-100">
-                  {hour.total_minutes}p
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-1 flex gap-[2px]">
-        {data.map((hour) => (
-          <div key={hour.hour} className="flex-1 text-center text-[8px] font-bold text-slate-400">
-            {hour.hour % 3 === 0 ? hour.label.slice(0, 2) : ""}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MissionMixBar({ mix }: { mix: Record<string, number> }) {
-  const labels: Record<string, { label: string; color: string }> = {
-    learning: { label: "Học", color: "bg-emerald-400" },
-    reading: { label: "Đọc", color: "bg-blue-400" },
-    movement: { label: "Vận động", color: "bg-amber-400" },
-    creative: { label: "Sáng tạo", color: "bg-violet-400" },
-    reflection: { label: "Kỹ năng sống", color: "bg-pink-400" },
-  };
-  const total = Object.values(mix).reduce((sum, value) => sum + value, 0) || 1;
-
-  return (
-    <div>
-      <div className="flex h-4 overflow-hidden rounded-full bg-slate-100">
-        {Object.entries(mix).map(([key, value]) => (
-          <div
-            key={key}
-            className={`${labels[key]?.color || "bg-slate-300"} transition-all duration-500`}
-            style={{ width: `${(value / total) * 100}%` }}
-            title={`${labels[key]?.label || key}: ${value}`}
-          />
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-3">
-        {Object.entries(mix).map(([key, value]) => (
-          <span key={key} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-            <span className={`inline-block h-2 w-2 rounded-full ${labels[key]?.color || "bg-slate-300"}`} />
-            {labels[key]?.label || key}: {value}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) return "—";
@@ -178,6 +115,91 @@ function formatDateTime(value: string | null | undefined) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDateOnly(value: string) {
+  return new Date(value).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function humanProfile(profile: string) {
+  if (profile === "low_screen") return "Ít màn hình";
+  if (profile === "learning_focused") return "Ưu tiên học tập";
+  if (profile === "balanced") return "Cân bằng";
+  return "Tùy chỉnh";
+}
+
+function UsageChart({ data }: { data: HourlyData[] }) {
+  const maxVal = Math.max(...data.map((item) => item.total_minutes), 1);
+
+  return (
+    <div className="mt-4">
+      <div className="flex h-44 items-end gap-1.5">
+        {data.map((hour) => {
+          const hasData = hour.total_minutes > 0;
+          const height = hasData ? Math.max((hour.total_minutes / maxVal) * 100, 8) : 4;
+          return (
+            <div key={hour.hour} className="group flex h-full flex-1 flex-col justify-end">
+              <div className="relative h-full">
+                <div
+                  className={`absolute inset-x-0 bottom-0 rounded-t-2xl transition-all duration-500 ${
+                    hasData
+                      ? "bg-gradient-to-t from-sky-500 via-emerald-400 to-yellow-300"
+                      : "bg-slate-100"
+                  }`}
+                  style={{ height: `${height}%` }}
+                  title={`${hour.label}: ${hour.total_minutes} phút`}
+                />
+                {hasData ? (
+                  <div className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-xl bg-slate-800 px-2.5 py-1 text-[10px] font-black whitespace-nowrap text-white opacity-0 transition-opacity group-hover:opacity-100">
+                    {hour.total_minutes} phút
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex gap-1.5">
+        {data.map((hour) => (
+          <div key={hour.hour} className="flex-1 text-center text-[9px] font-black text-slate-400">
+            {hour.hour % 3 === 0 ? hour.label.slice(0, 2) : ""}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BreakdownBars({ items }: { items: BreakdownItem[] }) {
+  const filtered = items.filter((item) => item.minutes > 0);
+  const max = Math.max(...filtered.map((item) => item.minutes), 1);
+
+  return (
+    <div className="grid gap-3">
+      {filtered.map((item) => (
+        <div key={item.key} className="grid gap-2">
+          <div className="flex items-center justify-between text-sm font-bold text-slate-700">
+            <span>{item.label}</span>
+            <span>{item.minutes} phút</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full ${
+                item.screen_based
+                  ? "bg-gradient-to-r from-sky-400 to-emerald-400"
+                  : "bg-gradient-to-r from-amber-300 to-orange-300"
+              }`}
+              style={{ width: `${Math.max((item.minutes / max) * 100, 6)}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function ParentDashboard() {
@@ -224,6 +246,7 @@ export function ParentDashboard() {
         }
       } catch (err) {
         setDashboard(null);
+        setHourlyData([]);
         setError(err instanceof Error ? err.message : "Không thể tải tổng quan.");
       } finally {
         setLoading(false);
@@ -232,19 +255,19 @@ export function ParentDashboard() {
     void loadDashboard();
   }, [selectedChildId]);
 
-  const capPercent = useMemo(() => {
-    if (!dashboard) return 0;
-    const cap = dashboard.rules.daily_entertainment_cap_minutes || 1;
-    const used = dashboard.metrics.discovery_minutes + dashboard.metrics.healthy_entertainment_minutes;
-    return Math.min((used / cap) * 100, 100);
-  }, [dashboard]);
+  const latestFinishedSession = useMemo(
+    () => dashboard?.recent_sessions.find((session) => session.status !== "active") ?? null,
+    [dashboard],
+  );
 
   if (loading) {
     return (
-      <Panel eyebrow="Tổng quan" title="Đang tải dữ liệu gia đình">
+      <Panel eyebrow="Tổng quan" title="Đang tải dữ liệu hoạt động">
         <div className="flex items-center gap-3 py-6">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-500" />
-          <p className="text-sm font-semibold text-slate-500">Kindy-Mate đang đồng bộ dashboard từ cơ sở dữ liệu.</p>
+          <p className="text-sm font-semibold text-slate-500">
+            Kindy-Mate đang tổng hợp dữ liệu sau các phiên dùng app gần đây.
+          </p>
         </div>
       </Panel>
     );
@@ -255,7 +278,7 @@ export function ParentDashboard() {
       <Panel eyebrow="Tổng quan" title="Chưa có hồ sơ trẻ">
         <div className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/70 p-6">
           <p className="text-sm font-semibold leading-6 text-slate-600">
-            Tài khoản phụ huynh đã sẵn sàng. Hãy tạo hồ sơ trẻ đầu tiên để dashboard có dữ liệu.
+            Tài khoản phụ huynh đã sẵn sàng. Hãy tạo hồ sơ trẻ đầu tiên để hệ thống bắt đầu ghi nhận các phiên hoạt động.
           </p>
           <Link
             className="mt-5 inline-flex rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-100"
@@ -270,9 +293,9 @@ export function ParentDashboard() {
 
   if (error || !dashboard) {
     return (
-      <Panel eyebrow="Tổng quan" title="Chưa thể tải dashboard">
+      <Panel eyebrow="Tổng quan" title="Chưa thể tải tổng quan">
         <p className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-bold text-slate-700">
-          {error || "Dữ liệu dashboard chưa sẵn sàng."}
+          {error || "Dữ liệu tổng quan chưa sẵn sàng."}
         </p>
       </Panel>
     );
@@ -292,99 +315,103 @@ export function ParentDashboard() {
             </option>
           ))}
         </select>
+        <span className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-2 text-xs font-black text-sky-700">
+          Cấu hình: {humanProfile(dashboard.rules.time_profile)}
+        </span>
         <span className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700">
-          💰 {dashboard.wallet.points_balance} điểm
+          Phiên tối đa {dashboard.rules.session_duration_limit_minutes} phút
         </span>
-        <span className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
-          ⭐ Tổng tích lũy: {dashboard.wallet.points_earned_total}
+        <span className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600">
+          Dữ liệu ngày {formatDateOnly(dashboard.report_date)}
         </span>
-        <button
-          type="button"
-          onClick={() => triggerChildEntry(selectedChildId)}
-          className="bubbly-btn ml-auto rounded-2xl bg-gradient-to-r from-blue-400 to-indigo-400 px-5 py-2.5 text-xs font-black text-white shadow-md"
-        >
-          ▶ Vào khu trẻ em
-        </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <div className="grid gap-6">
-          <Panel eyebrow="📊 Cân bằng phát triển" title="Hoạt động trong ngày">
-            <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Panel eyebrow="Ảnh chụp ngày gần nhất" title="Nhịp hoạt động trong phiên hoặc ngày gần nhất">
+            <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Metric label="Tổng thời gian app" value={`${dashboard.metrics.total_app_minutes} phút`} variant="purple" />
-              <Metric label="📚 Học tập" value={`${dashboard.metrics.learning_minutes} phút`} variant="green" />
-              <Metric label="📖 Đọc sách" value={`${dashboard.metrics.reading_minutes} phút`} variant="blue" />
-              <Metric label="🏃 Vận động" value={`${dashboard.metrics.movement_minutes} phút`} variant="yellow" />
-              <Metric label="🎨 Sáng tạo" value={`${dashboard.metrics.creative_minutes} phút`} variant="purple" />
-              <Metric label="🔬 Khám phá" value={`${dashboard.metrics.discovery_minutes} phút`} variant="blue" />
-              <Metric label="🎮 Giải trí lành mạnh" value={`${dashboard.metrics.healthy_entertainment_minutes} phút`} variant="yellow" />
-              <Metric label="🧸 Mascot" value={`${dashboard.metrics.mascot_minutes} phút`} variant="green" />
+              <Metric label="Thời gian màn hình" value={`${dashboard.metrics.screen_time_minutes} phút`} variant="blue" />
+              <Metric label="Ngoài màn hình" value={`${dashboard.metrics.offscreen_time_minutes} phút`} variant="green" />
+              <Metric label="Hoạt động chủ động" value={`${dashboard.metrics.active_minutes} phút`} variant="green" />
+              <Metric label="Nội dung thụ động" value={`${dashboard.metrics.passive_minutes} phút`} variant="yellow" />
+              <Metric label="Hoạt động đã ghi nhận" value={`${dashboard.metrics.completed_activity_count}`} variant="purple" />
             </div>
 
-            <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-5">
-              <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500">
-                <span>🎮 Hạn mức giải trí hôm nay</span>
-                <span className={capPercent >= 90 ? "text-rose-600" : "text-slate-600"}>{Math.round(capPercent)}% đã dùng</span>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tỷ lệ chủ động / thụ động</p>
+                <p className="mt-2 text-2xl font-black text-slate-800">
+                  {dashboard.comparisons.active_vs_passive.active_ratio}% / {dashboard.comparisons.active_vs_passive.passive_ratio}%
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {dashboard.comparisons.active_vs_passive.active_minutes} phút chủ động ·{" "}
+                  {dashboard.comparisons.active_vs_passive.passive_minutes} phút thụ động
+                </p>
               </div>
-              <div className="h-3 w-full overflow-hidden rounded-full bg-white">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${
-                    capPercent >= 90 ? "bg-gradient-to-r from-rose-300 to-rose-400" : "bg-gradient-to-r from-amber-300 to-teal-300"
-                  }`}
-                  style={{ width: `${capPercent}%` }}
-                />
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tỷ lệ màn hình / ngoài màn hình</p>
+                <p className="mt-2 text-2xl font-black text-slate-800">
+                  {dashboard.comparisons.screen_vs_offscreen.screen_ratio}% / {dashboard.comparisons.screen_vs_offscreen.offscreen_ratio}%
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {dashboard.comparisons.screen_vs_offscreen.screen_minutes} phút màn hình ·{" "}
+                  {dashboard.comparisons.screen_vs_offscreen.offscreen_minutes} phút ngoài màn hình
+                </p>
               </div>
-              <p className="mt-2 text-[11px] font-bold text-slate-400">
-                Còn {dashboard.metrics.cap_left_today} phút trong hạn mức ngày · Tạm dừng:{" "}
-                {dashboard.rules.entertainment_paused ? "🔴 Bật" : "🟢 Tắt"}
-              </p>
             </div>
           </Panel>
 
-          <Panel eyebrow="⏰ Biểu đồ sử dụng" title="Thời gian hoạt động theo giờ trong ngày">
+          <Panel eyebrow="Theo giờ" title="Thời gian hoạt động theo giờ trong ngày">
             {hourlyData.some((hour) => hour.total_minutes > 0) ? (
               <UsageChart data={hourlyData} />
             ) : (
-              <p className="py-6 text-center text-xs font-bold text-slate-400">Chưa có dữ liệu sử dụng hôm nay.</p>
+              <p className="py-6 text-center text-xs font-bold text-slate-400">
+                Chưa có dữ liệu hoạt động theo giờ cho ngày gần nhất được chọn.
+              </p>
             )}
-          </Panel>
-
-          <Panel eyebrow="🧭 Phiên hiện tại" title="Theo dõi realtime child mode">
-            {dashboard.current_session ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Metric label="Tổng phiên hiện tại" value={`${dashboard.current_session.current_session_minutes} phút`} variant="purple" />
-                <Metric label="Screen time hiện tại" value={`${dashboard.current_session.current_screen_minutes} phút`} variant="blue" />
-                <Metric label="Liên tục hiện tại" value={`${dashboard.current_session.current_continuous_screen_minutes} phút`} variant="yellow" />
-                <Metric label="Ngoài màn hình" value={`${dashboard.current_session.current_offscreen_minutes} phút`} variant="green" />
-                <Metric label="Còn lại của phiên" value={`${dashboard.current_session.remaining_session_minutes} phút`} variant="green" />
-                <Metric label="Còn lại screen time" value={`${dashboard.current_session.remaining_screen_minutes} phút`} variant="blue" />
-                <Metric label="Còn trước khi phải nghỉ" value={`${dashboard.current_session.remaining_continuous_screen_minutes} phút`} variant="yellow" />
-                <Metric label="Trạng thái" value={dashboard.limit_state.state} variant="purple" />
-              </div>
-            ) : (
-              <p className="text-sm font-semibold text-slate-500">Hiện chưa có phiên child mode nào đang mở.</p>
-            )}
-
-            {dashboard.current_session ? (
-              <div className="mt-4 rounded-2xl border border-[#dff6ee] bg-[#f3fbf7] p-4 text-sm font-bold leading-7 text-slate-700">
-                Đang ở: <strong>{dashboard.limit_state.current_activity_title || "—"}</strong> · Loại hoạt động:{" "}
-                <strong>{dashboard.limit_state.current_activity_type || "—"}</strong> · Heartbeat gần nhất:{" "}
-                <strong>{formatDateTime(dashboard.limit_state.last_heartbeat_at)}</strong>
-              </div>
-            ) : null}
-
-            {dashboard.limit_state.active_break_requirement ? (
-              <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-bold leading-7 text-slate-700">
-                Break đang mở · Yêu cầu nghỉ {dashboard.limit_state.active_break_requirement.required_minutes} phút · Timer xong:{" "}
-                {dashboard.limit_state.active_break_requirement.timer_completed_at ? "Đã đủ" : "Chưa"} · Task xong:{" "}
-                {dashboard.limit_state.active_break_requirement.task_completed_at ? "Đã xong" : "Chưa"}
-              </div>
-            ) : null}
           </Panel>
         </div>
 
         <div className="grid content-start gap-6">
-          <Panel eyebrow="🛡️ An toàn" title="Gợi ý cho phụ huynh">
+          <Panel eyebrow="Phiên gần nhất" title="Tóm tắt sau phiên vừa ghi nhận">
+            {latestFinishedSession ? (
+              <div className="grid gap-3">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Hoạt động gần nhất</p>
+                  <p className="mt-2 text-lg font-black text-slate-800">
+                    {latestFinishedSession.content_title ||
+                      latestFinishedSession.notes ||
+                      latestFinishedSession.display_category ||
+                      "Hoạt động gần nhất"}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {latestFinishedSession.duration_minutes} phút · {formatDateTime(latestFinishedSession.started_at)}
+                  </p>
+                </div>
+
+                {dashboard.current_session ? (
+                  <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-sm font-bold leading-6 text-slate-700">
+                    Hiện đang có một phiên mở trong khu trẻ em. Báo cáo tổng hợp sẽ chốt lại đầy đủ khi phiên này kết thúc.
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-slate-500">
+                Chưa có phiên hoàn chỉnh nào để tổng hợp. Sau khi bé kết thúc một phiên, phần này sẽ hiển thị ngay.
+              </p>
+            )}
+          </Panel>
+
+          <Panel eyebrow="Phân bổ hoạt động" title="Nhóm hoạt động trong ngày gần nhất">
+            {dashboard.today_breakdown.some((item) => item.minutes > 0) ? (
+              <BreakdownBars items={dashboard.today_breakdown} />
+            ) : (
+              <p className="text-sm font-semibold text-slate-500">Chưa có hoạt động nào được ghi nhận cho ngày gần nhất.</p>
+            )}
+          </Panel>
+
+          <Panel eyebrow="Gợi ý cho phụ huynh" title="Điểm cần chú ý">
             <div className="space-y-2">
               {dashboard.alerts.length ? (
                 dashboard.alerts.map((alert, index) => (
@@ -398,45 +425,11 @@ export function ParentDashboard() {
                 </div>
               )}
             </div>
-          </Panel>
-
-          <Panel eyebrow="🎯 Nhiệm vụ" title="Phân bổ nhiệm vụ đã hoàn thành">
-            <div className="mt-2">
-              <MissionMixBar mix={dashboard.mission_mix} />
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Metric label="✅ Hoàn thành" value={`${dashboard.metrics.mission_completion_count}`} variant="green" />
-              <Metric label="🚫 Bị chặn" value={`${dashboard.metrics.blocked_attempts}`} variant="rose" />
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Tóm tắt gần đây</p>
+              <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-700">{dashboard.weekly_summary}</p>
             </div>
           </Panel>
-
-          {dashboard.recent_transactions.length > 0 ? (
-            <Panel eyebrow="💎 Giao dịch gần đây" title="Lịch sử điểm thưởng">
-              <div className="mt-2 space-y-2">
-                {dashboard.recent_transactions.slice(0, 5).map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3">
-                    <div>
-                      <span className="block text-xs font-black text-slate-700">{transaction.reason}</span>
-                      <span className="text-[10px] font-bold text-slate-400">{formatDateTime(transaction.created_at)}</span>
-                    </div>
-                    <span
-                      className={`text-xs font-black ${
-                        transaction.type === "earn" ? "text-emerald-600" : transaction.type === "spend" ? "text-rose-500" : "text-slate-500"
-                      }`}
-                    >
-                      {transaction.type === "earn" ? "+" : transaction.type === "spend" ? "-" : ""}
-                      {transaction.points}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          ) : null}
-
-          <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-5">
-            <p className="text-xs font-black uppercase tracking-wider text-amber-700">📈 Tóm tắt tuần</p>
-            <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-700">{dashboard.weekly_summary}</p>
-          </div>
         </div>
       </div>
     </div>

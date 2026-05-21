@@ -13,38 +13,38 @@ type ChildProfile = {
 
 type DashboardData = {
   child: ChildProfile;
-  wallet: {
-    points_balance: number;
-    points_earned_total: number;
-    points_spent_total: number;
-  };
+  report_date: string;
   metrics: {
-    learning_minutes: number;
-    reading_minutes: number;
-    movement_minutes: number;
-    creative_minutes: number;
-    discovery_minutes: number;
-    healthy_entertainment_minutes: number;
-    screen_time_minutes: number;
     total_app_minutes: number;
-    mission_completion_count: number;
-    blocked_attempts: number;
-    cap_left_today: number;
+    screen_time_minutes: number;
+    offscreen_time_minutes: number;
+    active_minutes: number;
+    passive_minutes: number;
+    completed_activity_count: number;
+  };
+  weekly_metrics: {
+    total_app_minutes: number;
+    screen_time_minutes: number;
+    offscreen_time_minutes: number;
+    active_minutes: number;
+    passive_minutes: number;
+    completed_activity_count: number;
   };
   alerts: string[];
   weekly_summary: string;
+  eda_highlights: string[];
   current_session: {
     current_session_minutes: number;
     current_screen_minutes: number;
     remaining_session_minutes: number;
-    remaining_screen_minutes: number;
     current_activity_title: string;
   } | null;
-  recent_transactions: Array<{
-    reason: string;
-    points: number;
-    created_at: string;
-  }>;
+  latest_activity: {
+    duration_minutes: number;
+    notes: string;
+    content_title?: string;
+    started_at: string;
+  } | null;
 };
 
 type ChatMessage = {
@@ -56,10 +56,10 @@ type ChatMessage = {
 
 const starterQuestions = [
   "Hôm nay con dùng app bao lâu rồi?",
-  "Con đang làm gì bây giờ?",
-  "Tuần này nên chú ý điều gì?",
-  "Điểm thưởng của con đang thế nào?",
-  "Có cảnh báo an toàn nào không?",
+  "Phiên gần nhất của con có gì đáng chú ý?",
+  "Tuần này xu hướng dùng app của con ra sao?",
+  "Con đang thiên về hoạt động chủ động hay thụ động?",
+  "Có điều gì phụ huynh nên chú ý không?",
 ];
 
 const diagnosisKeywords = ["nghiện", "tâm lý", "trầm cảm", "adhd", "bệnh", "rối loạn", "thiếu tập trung", "chẩn đoán"];
@@ -74,21 +74,18 @@ function formatDateTime(value: string) {
 }
 
 function hasEnoughData(data: DashboardData) {
-  return (
-    data.metrics.total_app_minutes > 0 ||
-    data.metrics.mission_completion_count > 0 ||
-    data.recent_transactions.length > 0
-  );
+  return data.weekly_metrics.total_app_minutes > 0 || data.metrics.total_app_minutes > 0;
 }
 
 function buildAnswer(question: string, data: DashboardData): ChatMessage {
   const normalized = question.toLowerCase();
+
   if (diagnosisKeywords.some((keyword) => normalized.includes(keyword))) {
     return {
       role: "assistant",
       content:
-        "Tôi không thể chẩn đoán hay gắn nhãn tâm lý/y tế cho trẻ. Tôi chỉ có thể tóm tắt dữ liệu sử dụng app, điểm thưởng và các luật an toàn hiện có.",
-      source: "dashboard",
+        "Tôi không thể chẩn đoán hay gắn nhãn tâm lý hoặc y tế cho trẻ. Tôi chỉ có thể tóm tắt dữ liệu hoạt động và thời gian dùng app hiện có.",
+      source: "reports",
       link: "/parent/reports",
     };
   }
@@ -97,7 +94,7 @@ function buildAnswer(question: string, data: DashboardData): ChatMessage {
     return {
       role: "assistant",
       content:
-        "Hiện chưa có đủ dữ liệu trong phiên hoặc trong ngày để kết luận xu hướng. Bạn có thể xem lại sau khi bé dùng app thêm vài phiên.",
+        "Hiện chưa có đủ dữ liệu trong tuần này để kết luận xu hướng. Bạn có thể xem lại sau khi bé dùng app thêm vài phiên.",
       source: "reports",
       link: "/parent/reports",
     };
@@ -106,7 +103,18 @@ function buildAnswer(question: string, data: DashboardData): ChatMessage {
   if (normalized.includes("bao lâu") || normalized.includes("bao nhiêu") || normalized.includes("thời gian")) {
     return {
       role: "assistant",
-      content: `Dựa trên hoạt động hôm nay, ${data.child.nickname} đã dùng app ${data.metrics.total_app_minutes} phút, trong đó screen time là ${data.metrics.screen_time_minutes} phút. Còn lại ${data.metrics.cap_left_today} phút cap giải trí trong ngày.`,
+      content: `Dựa trên dữ liệu ngày ${new Date(data.report_date).toLocaleDateString("vi-VN")}, ${data.child.nickname} đã dùng app ${data.metrics.total_app_minutes} phút, trong đó ${data.metrics.screen_time_minutes} phút trên màn hình và ${data.metrics.offscreen_time_minutes} phút ngoài màn hình.`,
+      source: "dashboard",
+      link: "/parent/dashboard",
+    };
+  }
+
+  if (normalized.includes("phiên gần nhất") || normalized.includes("vừa dùng") || normalized.includes("vừa rồi")) {
+    return {
+      role: "assistant",
+      content: data.latest_activity
+        ? `Phiên gần nhất tôi ghi nhận là "${data.latest_activity.content_title || data.latest_activity.notes || "một hoạt động trong app"}" vào ${formatDateTime(data.latest_activity.started_at)}, kéo dài ${data.latest_activity.duration_minutes} phút.`
+        : `Hiện tôi chưa có phiên hoàn chỉnh nào gần đây của ${data.child.nickname}.`,
       source: "dashboard",
       link: "/parent/dashboard",
     };
@@ -116,37 +124,34 @@ function buildAnswer(question: string, data: DashboardData): ChatMessage {
     return {
       role: "assistant",
       content: data.current_session
-        ? `Dựa trên phiên hiện tại, ${data.child.nickname} đang ở "${data.current_session.current_activity_title || "một hoạt động trong app"}". Phiên này đã kéo dài ${data.current_session.current_session_minutes} phút và còn ${data.current_session.remaining_session_minutes} phút trước khi hết thời lượng phiên.`
-        : `${data.child.nickname} hiện chưa có child mode nào đang mở.`,
+        ? `${data.child.nickname} đang ở "${data.current_session.current_activity_title || "một hoạt động trong app"}". Phiên hiện tại đã kéo dài ${data.current_session.current_session_minutes} phút.`
+        : `${data.child.nickname} hiện chưa có phiên khu trẻ em nào đang mở.`,
       source: "dashboard",
       link: "/parent/dashboard",
     };
   }
 
-  if (normalized.includes("điểm") || normalized.includes("thưởng") || normalized.includes("đổi quà")) {
-    const latest = data.recent_transactions[0];
+  if (normalized.includes("chủ động") || normalized.includes("thụ động")) {
     return {
       role: "assistant",
-      content: latest
-        ? `${data.child.nickname} đang có ${data.wallet.points_balance} điểm. Giao dịch gần nhất là "${latest.reason}" vào ${formatDateTime(latest.created_at)} với biến động ${latest.points > 0 ? "+" : ""}${latest.points} điểm.`
-        : `${data.child.nickname} đang có ${data.wallet.points_balance} điểm và chưa có giao dịch điểm nào gần đây.`,
-      source: "dashboard",
-      link: "/parent/dashboard",
+      content: `Trong 7 ngày gần đây, ${data.child.nickname} có ${data.weekly_metrics.active_minutes} phút hoạt động chủ động và ${data.weekly_metrics.passive_minutes} phút nội dung thụ động. ${data.eda_highlights[0] || ""}`.trim(),
+      source: "reports",
+      link: "/parent/reports",
     };
   }
 
-  if (normalized.includes("an toàn") || normalized.includes("cảnh báo") || normalized.includes("chặn")) {
+  if (normalized.includes("an toàn") || normalized.includes("chú ý") || normalized.includes("cảnh báo")) {
     return {
       role: "assistant",
       content: data.alerts.length
-        ? `Hiện có ${data.alerts.length} ghi chú an toàn. Nổi bật nhất: ${data.alerts[0]}`
-        : "Hiện chưa có cảnh báo an toàn mới trong dashboard.",
+        ? `Hiện có ${data.alerts.length} ghi chú dành cho phụ huynh. Mục nổi bật nhất là: ${data.alerts[0]}`
+        : "Hiện chưa có ghi chú an toàn mới trong dashboard.",
       source: "dashboard",
       link: "/parent/dashboard",
     };
   }
 
-  if (normalized.includes("tuần") || normalized.includes("nên") || normalized.includes("gợi ý")) {
+  if (normalized.includes("tuần") || normalized.includes("xu hướng") || normalized.includes("báo cáo")) {
     return {
       role: "assistant",
       content: data.weekly_summary,
@@ -158,9 +163,9 @@ function buildAnswer(question: string, data: DashboardData): ChatMessage {
   return {
     role: "assistant",
     content:
-      "Tôi có thể giúp tóm tắt thời gian dùng app, phiên hiện tại, điểm thưởng, cảnh báo an toàn và xu hướng trong báo cáo. Hãy hỏi ngắn gọn theo một trong các hướng đó.",
-    source: "dashboard",
-    link: "/parent/dashboard",
+      "Tôi có thể tóm tắt thời gian dùng app, phiên gần nhất, xu hướng 7 ngày, tỷ lệ hoạt động chủ động hoặc thụ động và các ghi chú dành cho phụ huynh.",
+    source: "reports",
+    link: "/parent/reports",
   };
 }
 
@@ -173,9 +178,9 @@ export function ParentInsights() {
     {
       role: "assistant",
       content:
-        "Tôi chỉ trả lời dựa trên dashboard, báo cáo, session và điểm thưởng hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
-      source: "dashboard",
-      link: "/parent/dashboard",
+        "Tôi chỉ trả lời dựa trên dashboard, báo cáo và lịch sử phiên hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
+      source: "reports",
+      link: "/parent/reports",
     },
   ]);
   const [loading, setLoading] = useState(true);
@@ -208,9 +213,9 @@ export function ParentInsights() {
         {
           role: "assistant",
           content:
-            "Tôi chỉ trả lời dựa trên dashboard, báo cáo, session và điểm thưởng hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
-          source: "dashboard",
-          link: "/parent/dashboard",
+            "Tôi chỉ trả lời dựa trên dashboard, báo cáo và lịch sử phiên hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
+          source: "reports",
+          link: "/parent/reports",
         },
       ]);
       try {
@@ -220,7 +225,7 @@ export function ParentInsights() {
           window.localStorage.setItem("active_child_id", selectedChildId);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Không thể tải dữ liệu insights.");
+        setError(err instanceof Error ? err.message : "Không thể tải dữ liệu trợ lý.");
         setDashboard(null);
       } finally {
         setLoading(false);
@@ -243,7 +248,7 @@ export function ParentInsights() {
     <div className="grid gap-6 py-4 xl:grid-cols-[0.72fr_1.28fr]">
       <Panel eyebrow="Hỏi AI" title="Trợ lý dữ liệu cho phụ huynh">
         <p className="text-sm font-semibold leading-7 text-slate-600">
-          Hỏi nhanh về phiên dùng app, điểm thưởng, cảnh báo an toàn và xu hướng gần đây của con mà không cần đọc toàn bộ báo cáo.
+          Hỏi nhanh về thời gian dùng app, phiên gần nhất, xu hướng 7 ngày và các ghi chú quan trọng mà không cần đọc toàn bộ báo cáo.
         </p>
 
         <label className="mt-5 grid gap-2 text-sm font-black text-slate-700">
@@ -276,8 +281,9 @@ export function ParentInsights() {
 
         {dashboard ? (
           <div className="mt-5 rounded-[1.5rem] border border-[#dff6ee] bg-[#f3fbf7] p-4 text-sm font-bold leading-6 text-slate-700">
-            Dựa trên hoạt động hôm nay: {dashboard.child.nickname} đã dùng app {dashboard.metrics.total_app_minutes} phút, hoàn thành{" "}
-            {dashboard.metrics.mission_completion_count} nhiệm vụ và còn {dashboard.metrics.cap_left_today} phút cap giải trí.
+            Tóm tắt nhanh: trong chu kỳ kết thúc ngày {new Date(dashboard.report_date).toLocaleDateString("vi-VN")},{" "}
+            {dashboard.child.nickname} đã dùng app {dashboard.metrics.total_app_minutes} phút. Trong 7 ngày gần đây có{" "}
+            {dashboard.weekly_metrics.completed_activity_count} hoạt động được ghi nhận.
           </div>
         ) : null}
       </Panel>
@@ -313,7 +319,7 @@ export function ParentInsights() {
               <textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder="Ví dụ: Hôm nay con đang làm gì?"
+                placeholder="Ví dụ: Tuần này con đang thiên về hoạt động gì?"
                 className="min-h-28 rounded-[1.5rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-sky-300"
               />
               <button

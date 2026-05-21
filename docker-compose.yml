@@ -39,6 +39,9 @@ services:
       - "8000:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    init: true
+    stop_signal: SIGINT
+    stop_grace_period: 10s
     volumes:
       - ./backend:/app/backend
       - /app/backend/.venv
@@ -57,14 +60,29 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
       NEXT_PUBLIC_ENV: development
       WATCHPACK_POLLING: "true"
+      WATCHPACK_POLLING_INTERVAL: "1000"
+      NEXT_TELEMETRY_DISABLED: "1"
     ports:
       - "3000:3000"
+    init: true
+    stop_signal: SIGINT
+    stop_grace_period: 10s
     volumes:
-      - ./frontend:/app/frontend
-      - /app/frontend/node_modules
-      - /app/frontend/.next
+      - ./frontend/src:/app/frontend/src
+      - ./frontend/public:/app/frontend/public
+      - ./frontend/package.json:/app/frontend/package.json
+      - ./frontend/pnpm-lock.yaml:/app/frontend/pnpm-lock.yaml
+      - ./frontend/tsconfig.json:/app/frontend/tsconfig.json
+      - ./frontend/next.config.ts:/app/frontend/next.config.ts
+      - ./frontend/next-env.d.ts:/app/frontend/next-env.d.ts
+      - ./frontend/postcss.config.mjs:/app/frontend/postcss.config.mjs
+      - ./frontend/eslint.config.mjs:/app/frontend/eslint.config.mjs
+      - frontend_node_modules:/app/frontend/node_modules
+      - frontend_next:/app/frontend/.next
     depends_on:
       - backend
 
 volumes:
   postgres_data:
+  frontend_node_modules:
+  frontend_next:

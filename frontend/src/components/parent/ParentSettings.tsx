@@ -24,8 +24,14 @@ function PinSection() {
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const session = readAuthSession();
-  const hasPinConfigured = session?.user?.pin_configured;
+  const hasPinConfigured = mounted ? session?.user?.pin_configured : false;
 
   async function handleChangePin() {
     setStatus("");
@@ -317,8 +323,8 @@ export function ParentSettings() {
       <section id="general" className="scroll-mt-28">
         <Panel eyebrow="Cài đặt chung" title="Nguyên tắc tài khoản phụ huynh">
           <div className="grid gap-3 text-sm font-semibold leading-7 text-slate-600">
-            <p>Tài khoản phụ huynh là nơi duy nhất được phép đổi luật, vào dashboard, kết thúc child mode và xuất/xóa dữ liệu.</p>
-            <p>Những thay đổi quan trọng nên được thực hiện từ đây thay vì trong child mode để tránh lộ controls cho trẻ.</p>
+            <p>Tài khoản phụ huynh là nơi duy nhất được phép đổi luật, vào dashboard, kết thúc khu trẻ em và xuất/xóa dữ liệu.</p>
+            <p>Những thay đổi quan trọng nên được thực hiện từ đây thay vì trong khu trẻ em để tránh lộ controls cho trẻ.</p>
           </div>
         </Panel>
       </section>

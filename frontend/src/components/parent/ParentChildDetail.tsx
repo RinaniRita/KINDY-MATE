@@ -52,37 +52,31 @@ type RuleMeta = {
 };
 
 type DashboardData = {
-  wallet: {
-    points_balance: number;
-    points_earned_total: number;
-    points_spent_total: number;
-  };
   metrics: {
     total_app_minutes: number;
     screen_time_minutes: number;
+    offscreen_time_minutes: number;
+    active_minutes: number;
+    passive_minutes: number;
     learning_minutes: number;
     reading_minutes: number;
     movement_minutes: number;
     creative_minutes: number;
     discovery_minutes: number;
     healthy_entertainment_minutes: number;
-    mission_completion_count: number;
-    blocked_attempts: number;
-    cap_left_today: number;
+    completed_activity_count: number;
   };
   alerts: string[];
-  recent_transactions: Array<{
-    id: string;
-    reason: string;
-    points: number;
-    type: string;
-    created_at: string;
-  }>;
+  weekly_summary: string;
   recent_sessions: Array<{
     id: string;
     session_type: string;
+    content_title?: string;
+    activity_category: string;
+    display_category: string;
     duration_minutes: number;
-    blocked_reason?: string;
+    notes: string;
+    status: string;
     started_at: string;
     ended_at?: string | null;
   }>;
@@ -164,7 +158,7 @@ const categoryToggles = [
   },
   {
     id: "mascot",
-    label: "Mascot customization",
+    label: "Tùy chỉnh Milo",
     note: "Đồ cho Milo và các tương tác thay đổi mascot.",
     values: ["mascot_item", "customization"],
   },
@@ -179,6 +173,22 @@ function formatDateTime(value?: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function humanActivityKey(value: string) {
+  const mapping: Record<string, string> = {
+    learning: "Học tập",
+    reading: "Đọc sách",
+    movement: "Vận động",
+    creativity: "Sáng tạo",
+    life_skill: "Kỹ năng sống",
+    discovery: "Khám phá",
+    healthy_entertainment: "Giải trí lành mạnh",
+    mascot: "Milo & mascot",
+    break: "Nghỉ màn hình",
+    idle: "Mở app nhưng chưa vào hoạt động",
+  };
+  return mapping[value] ?? value;
 }
 
 function childEmoji(avatarId: string) {
@@ -219,6 +229,7 @@ export function ParentChildDetail({ childId }: { childId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [showAllSessions, setShowAllSessions] = useState(false);
   const activeTab = manualTab ?? queryTab;
 
   useEffect(() => {
@@ -246,11 +257,6 @@ export function ParentChildDetail({ childId }: { childId: string }) {
     }
     void load();
   }, [childId]);
-
-  const minimumOffscreen = useMemo(() => {
-    if (!form) return 0;
-    return Math.max(form.sessionDuration - form.totalScreen, 0);
-  }, [form]);
 
   function updateForm<K extends keyof RuleForm>(key: K, value: RuleForm[K]) {
     setForm((current) => (current ? { ...current, [key]: value } : current));
@@ -400,10 +406,10 @@ export function ParentChildDetail({ childId }: { childId: string }) {
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <Panel eyebrow="Tổng quan" title="Snapshot của hôm nay">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Metric label="Điểm hiện có" value={`${dashboard.wallet.points_balance}`} variant="green" />
               <Metric label="Tổng app hôm nay" value={`${dashboard.metrics.total_app_minutes} phút`} variant="purple" />
-              <Metric label="Screen time hôm nay" value={`${dashboard.metrics.screen_time_minutes} phút`} variant="blue" />
-              <Metric label="Còn cap giải trí" value={`${dashboard.metrics.cap_left_today} phút`} variant="yellow" />
+              <Metric label="Thời gian màn hình" value={`${dashboard.metrics.screen_time_minutes} phút`} variant="blue" />
+              <Metric label="Ngoài màn hình" value={`${dashboard.metrics.offscreen_time_minutes} phút`} variant="green" />
+              <Metric label="Hoạt động đã ghi nhận" value={`${dashboard.metrics.completed_activity_count}`} variant="yellow" />
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -464,12 +470,12 @@ export function ParentChildDetail({ childId }: { childId: string }) {
                   }`}
                 >
                   {profile === "low_screen"
-                    ? "Low-screen"
+                    ? "Ít màn hình"
                     : profile === "balanced"
-                      ? "Balanced"
+                      ? "Cân bằng"
                       : profile === "learning_focused"
-                        ? "Learning-focused"
-                        : "Custom"}
+                        ? "Ưu tiên học tập"
+                        : "Tùy chỉnh"}
                 </button>
               ))}
             </div>
@@ -481,7 +487,7 @@ export function ParentChildDetail({ childId }: { childId: string }) {
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-black text-slate-700">
-                Session Duration Limit
+                Giới hạn thời lượng phiên
                 <input
                   type="number"
                   min={15}
@@ -492,7 +498,7 @@ export function ParentChildDetail({ childId }: { childId: string }) {
                 />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-700">
-                Total Screen Time Limit
+                Giới hạn tổng thời gian màn hình
                 <input
                   type="number"
                   min={10}
@@ -503,7 +509,7 @@ export function ParentChildDetail({ childId }: { childId: string }) {
                 />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-700">
-                Continuous Screen Time Limit
+                Giới hạn thời gian màn hình liên tục
                 <input
                   type="number"
                   min={5}
@@ -514,7 +520,7 @@ export function ParentChildDetail({ childId }: { childId: string }) {
                 />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-700">
-                Minimum Off-screen Break
+                Thời gian nghỉ giữa các lần nhìn màn hình
                 <input
                   type="number"
                   min={3}
@@ -544,14 +550,10 @@ export function ParentChildDetail({ childId }: { childId: string }) {
               </label>
             </div>
 
-            <div className="rounded-[1.5rem] border border-amber-100 bg-amber-50/70 p-4 text-sm font-bold leading-6 text-slate-700">
-              Minimum off-screen time = Session Duration - Total Screen Time = <strong>{minimumOffscreen} phút</strong>.
-            </div>
-
             <div className="flex items-center justify-between rounded-[1.5rem] border border-rose-100 bg-rose-50/70 px-5 py-4">
               <div>
-                <p className="text-sm font-black text-slate-800">Emergency pause</p>
-                <p className="text-xs font-semibold text-slate-500">Tạm dừng ngay các luồng giải trí dùng điểm trong app.</p>
+                <p className="text-sm font-black text-slate-800">Tạm dừng khẩn cấp</p>
+                <p className="text-xs font-semibold text-slate-500">Tạm dừng nhanh việc bắt đầu phiên mới để phụ huynh xem lại cấu hình khi cần.</p>
               </div>
               <button
                 type="button"
@@ -681,42 +683,48 @@ export function ParentChildDetail({ childId }: { childId: string }) {
           <Panel eyebrow="Lịch sử phiên" title="Session gần đây">
             <div className="grid gap-3">
               {dashboard.recent_sessions.length ? (
-                dashboard.recent_sessions.map((session) => (
-                  <div key={session.id} className="rounded-[1.5rem] border border-slate-100 bg-white p-4">
-                    <p className="text-sm font-black text-slate-800">{session.session_type}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      {formatDateTime(session.started_at)}
-                      {session.ended_at ? ` → ${formatDateTime(session.ended_at)}` : ""}
-                    </p>
-                    <p className="mt-2 text-sm font-bold text-slate-700">{session.duration_minutes} phút</p>
-                    {session.blocked_reason ? (
-                      <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">
-                        Lý do chặn: {session.blocked_reason}
+                <>
+                  {(showAllSessions ? dashboard.recent_sessions : dashboard.recent_sessions.slice(0, 5)).map((session) => (
+                    <div key={session.id} className="rounded-[1.5rem] border border-slate-100 bg-white p-4">
+                      <p className="text-sm font-black text-slate-800">
+                        {session.content_title || session.notes || humanActivityKey(session.activity_category)}
                       </p>
-                    ) : null}
-                  </div>
-                ))
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {formatDateTime(session.started_at)}
+                        {session.ended_at ? ` → ${formatDateTime(session.ended_at)}` : ""}
+                      </p>
+                      <p className="mt-2 text-sm font-bold text-slate-700">{session.duration_minutes} phút</p>
+                    </div>
+                  ))}
+                  {dashboard.recent_sessions.length > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllSessions(!showAllSessions)}
+                      className="mt-2 text-xs font-black text-slate-500 hover:text-slate-800 self-center border border-slate-200 bg-white px-4 py-2 rounded-full shadow-sm hover:shadow transition"
+                    >
+                      {showAllSessions ? "Thu gọn bớt" : `Xem tất cả (${dashboard.recent_sessions.length})`}
+                    </button>
+                  )}
+                </>
               ) : (
                 <p className="text-sm font-semibold text-slate-500">Chưa có session nào gần đây.</p>
               )}
             </div>
           </Panel>
 
-          <Panel eyebrow="Điểm thưởng" title="Reward và giao dịch gần đây">
+          <Panel eyebrow="Tóm tắt" title="Nhận định gần đây">
             <div className="grid gap-3">
-              {dashboard.recent_transactions.length ? (
-                dashboard.recent_transactions.map((transaction) => (
-                  <div key={transaction.id} className="rounded-[1.5rem] border border-slate-100 bg-white p-4">
-                    <p className="text-sm font-black text-slate-800">{transaction.reason}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{formatDateTime(transaction.created_at)}</p>
-                    <p className="mt-2 text-sm font-bold text-slate-700">
-                      {transaction.type === "earn" ? "+" : transaction.type === "spend" ? "-" : ""}
-                      {transaction.points} điểm
-                    </p>
-                  </div>
-                ))
+              <div className="rounded-[1.5rem] border border-[#dff6ee] bg-[#f3fbf7] p-4 text-sm font-semibold leading-7 text-slate-700">
+                {dashboard.weekly_summary}
+              </div>
+              {dashboard.current_session ? (
+                <div className="rounded-[1.5rem] border border-sky-100 bg-sky-50/80 p-4 text-sm font-bold leading-6 text-slate-700">
+                  Hiện đang có một phiên mở trong khu trẻ em. Báo cáo đầy đủ sẽ được khóa lại sau khi phiên này kết thúc.
+                </div>
               ) : (
-                <p className="text-sm font-semibold text-slate-500">Chưa có giao dịch điểm gần đây.</p>
+                <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 text-sm font-semibold leading-7 text-slate-600">
+                  Hiện không có phiên nào đang mở. Phụ huynh có thể xem lịch sử bên cạnh để đối chiếu lại hoạt động gần đây của bé.
+                </div>
               )}
             </div>
           </Panel>

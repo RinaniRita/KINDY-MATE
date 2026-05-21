@@ -4,9 +4,9 @@ import { ParentChildDetail } from "@/components/parent/ParentChildDetail";
 export default async function ChildDetailPage({
   params,
 }: {
-  params: { childId: string };
+  params: Promise<{ childId: string }>;
 }) {
-  const { childId } = params;
+  const { childId } = await params;
 
   return (
     <ParentLayout>
