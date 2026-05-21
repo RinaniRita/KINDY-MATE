@@ -422,10 +422,10 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
 
     window.addEventListener("keydown", handleKeyboard);
     return () => window.removeEventListener("keydown", handleKeyboard);
-  });
+  }, [showPasscodeModal]);
 
   return (
-    <main className={`min-h-screen pb-16 selection:bg-[#dff6ee] selection:text-slate-800 ${isChildTone ? "bg-gradient-to-b from-[#fff7ea] via-[#eef8ff] to-[#ecfaf3]" : "bg-[#fffdf7]"}`}>
+    <main className={`min-h-screen ${!isChildTone ? "pb-16" : ""} selection:bg-[#dff6ee] selection:text-slate-800 ${isChildTone ? "bg-gradient-to-b from-[#fff7ea] via-[#eef8ff] to-[#ecfaf3]" : "bg-[#fffdf7]"}`}>
       {!isChildTone ? (
         <header className="sticky top-0 z-30 border-b border-white/60 bg-white/80 backdrop-blur-md">
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">

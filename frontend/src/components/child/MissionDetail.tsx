@@ -47,26 +47,49 @@ export function MissionDetail({ childId, missionId }: { childId: string; mission
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    const timeoutId = setTimeout(() => {
+      console.log("Forcefully setting loading false after 3 seconds");
+      if (isMounted) setLoading(false);
+    }, 3000);
+
     async function load() {
+      console.log("MissionDetail load() START", { childId, missionId });
       try {
+        console.log("Calling apiGetRequired for mission", missionId);
         const detail = await apiGetRequired<MissionData>(`/missions/${missionId}/`);
-        setMission(detail);
-      } catch {
+        console.log("Got detail", detail);
+        if (isMounted) setMission(detail);
+      } catch (err) {
+        console.log("Error in first try", err);
         try {
           const list = await apiGetRequired<MissionData[]>(`/missions/?child_id=${childId}`);
           const fallbackMission = list.find((item) => String(item.id) === String(missionId)) || null;
-          setMission(fallbackMission);
-          if (!fallbackMission) {
-            setError("Không tìm thấy nhiệm vụ.");
+          if (isMounted) {
+            setMission(fallbackMission);
+            if (!fallbackMission) {
+              setError("Không tìm thấy nhiệm vụ.");
+            }
           }
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Không thể tải nhiệm vụ.");
+        } catch (err2) {
+          if (isMounted) setError(err2 instanceof Error ? err2.message : "Không thể tải nhiệm vụ.");
         }
       } finally {
-        setLoading(false);
+        console.log("Setting loading to false");
+        if (isMounted) setLoading(false);
+        clearTimeout(timeoutId);
       }
     }
-    load().catch(() => setLoading(false));
+    load().catch((e) => {
+      console.log("load() catch block", e);
+      if (isMounted) setLoading(false);
+      clearTimeout(timeoutId);
+    });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [childId, missionId]);
 
   async function handleComplete() {

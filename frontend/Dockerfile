@@ -17,5 +17,6 @@ COPY . .
 # Expose Next.js default port
 EXPOSE 3000
 
-# Start development server
-CMD ["pnpm", "dev", "--hostname", "0.0.0.0"]
+# Clear the host-mapped .next cache on every container startup, then launch the dev server.
+# This prevents stale compiler cache from causing 404s on new/changed routes.
+CMD ["sh", "-c", "rm -rf .next && pnpm dev --hostname 0.0.0.0"]

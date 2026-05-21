@@ -1,6 +1,6 @@
 export type HubHotspot = {
   key: "study" | "watch" | "move" | "create" | "mascot" | "milo";
-  hrefKey: "study" | "watch" | "move" | "create" | "mascot" | "milo";
+  hrefKey: "study" | "watch" | "player" | "move" | "create" | "mascot" | "milo";
   caption: string;
   icon: string;
   left: number;
@@ -18,11 +18,11 @@ export const hubHotspots: HubHotspot[] = [
   },
   {
     key: "watch",
-    hrefKey: "watch",
+    hrefKey: "player",
     caption: "Xem cùng Milo",
     icon: "📺",
-    left: 49,
-    top: 23,
+    left: 50,
+    top: 11,
   },
   {
     key: "mascot",
