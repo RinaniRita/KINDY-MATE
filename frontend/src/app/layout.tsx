@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Baloo_2, Nunito } from "next/font/google";
 import "./globals.css";
 
 const nunito = Nunito({
   variable: "--font-nunito",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  display: "swap",
+});
+
+const baloo = Baloo_2({
+  variable: "--font-baloo",
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -19,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
-      <body className={`${nunito.variable} antialiased`}>
+    <html lang="vi" className={`${nunito.variable} ${baloo.variable}`}>
+      <body className="antialiased">
         {children}
       </body>
     </html>

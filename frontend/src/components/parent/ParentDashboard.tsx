@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Metric, Panel } from "@/components/common/Cards";
 import { apiGet, apiGetRequired } from "@/lib/api";
-import { prepareChildEntry } from "@/lib/child-entry";
+import { triggerChildEntry } from "@/lib/parent-actions";
 
 type ChildProfile = {
   id: string;
@@ -298,13 +298,13 @@ export function ParentDashboard() {
         <span className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
           ⭐ Tổng tích lũy: {dashboard.wallet.points_earned_total}
         </span>
-        <Link
-          href={`/child/${selectedChildId}/home`}
-          onClick={() => prepareChildEntry(selectedChildId)}
+        <button
+          type="button"
+          onClick={() => triggerChildEntry(selectedChildId)}
           className="bubbly-btn ml-auto rounded-2xl bg-gradient-to-r from-blue-400 to-indigo-400 px-5 py-2.5 text-xs font-black text-white shadow-md"
         >
           ▶ Vào khu trẻ em
-        </Link>
+        </button>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">

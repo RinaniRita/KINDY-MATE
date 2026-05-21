@@ -32,6 +32,9 @@
   --color-error: var(--error);
   
   --font-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-parent: var(--font-nunito), system-ui, sans-serif;
+  --font-child-body: var(--font-nunito), system-ui, sans-serif;
+  --font-child-display: var(--font-baloo), var(--font-nunito), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 
   --animate-float: float 4s ease-in-out infinite;
@@ -76,10 +79,61 @@ body {
     radial-gradient(at 100% 100%, hsla(43, 90%, 95%, 1) 0px, transparent 50%),
     radial-gradient(at 0% 100%, hsla(350, 90%, 95%, 1) 0px, transparent 50%);
   color: var(--foreground);
-  font-family: var(--font-sans);
+  font-family: var(--font-parent);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+}
+
+.theme-parent,
+.theme-public {
+  font-family: var(--font-parent);
+}
+
+.theme-child {
+  font-family: var(--font-child-body);
+}
+
+.theme-child h1,
+.theme-child h2,
+.theme-child h3,
+.theme-child h4,
+.theme-child .child-mini-badge,
+.theme-child .child-dock-link,
+.theme-child .hub-hotspot-core,
+.theme-child .hub-hotspot-label,
+.theme-child .hub-info-panel,
+.theme-child .child-soft-panel,
+.theme-child .child-orbit-chip,
+.theme-child .child-stage-board button,
+.theme-child .child-island-card button,
+.theme-child .bubbly-btn,
+.theme-child button {
+  font-family: var(--font-child-display);
+}
+
+.theme-child p,
+.theme-child li,
+.theme-child input,
+.theme-child textarea,
+.theme-child select,
+.theme-child .child-article-content {
+  font-family: var(--font-child-body);
+}
+
+.theme-child h1,
+.theme-child h2,
+.theme-child h3,
+.theme-child h4 {
+  line-height: 1.08;
+}
+
+.theme-child .child-mini-badge,
+.theme-child .hub-hotspot-label,
+.theme-child .child-dock-link,
+.theme-child .bubbly-btn,
+.theme-child button {
+  letter-spacing: 0;
 }
 
 html {

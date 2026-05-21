@@ -40,7 +40,7 @@ class Command(BaseCommand):
                 'daily_entertainment_cap_minutes': 25,
                 'cooldown_minutes': 15,
                 'require_balanced_missions': True,
-                'allowed_categories': ['reading', 'learning', 'movement', 'documentary', 'entertainment', 'mascot_item'],
+                'allowed_categories': ['reading', 'learning', 'movement', 'creative', 'reflection', 'documentary', 'entertainment', 'customization', 'mascot_item'],
             },
         )
         RewardWallet.objects.update_or_create(

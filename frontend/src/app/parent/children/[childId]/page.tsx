@@ -1,10 +1,16 @@
-import { ChildrenManager } from "@/components/parent/ParentControls";
 import { ParentLayout } from "@/components/parent/ParentLayout";
+import { ParentChildDetail } from "@/components/parent/ParentChildDetail";
 
-export default function ChildDetailPage() {
+export default async function ChildDetailPage({
+  params,
+}: {
+  params: { childId: string };
+}) {
+  const { childId } = params;
+
   return (
     <ParentLayout>
-      <ChildrenManager />
+      <ParentChildDetail childId={childId} />
     </ParentLayout>
   );
 }
