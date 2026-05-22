@@ -117,7 +117,7 @@ export function MiloHub({ childId }: { childId: string }) {
   // Initialize Speech Recognition
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
@@ -197,7 +197,7 @@ export function MiloHub({ childId }: { childId: string }) {
           screen_context: screenContext,
         },
         // onChunk — append text to the streaming placeholder
-        (chunk) => {
+        (chunk: string) => {
           accumulated += chunk;
           setMessages((prev) => {
             const next = [...prev];
@@ -215,7 +215,7 @@ export function MiloHub({ childId }: { childId: string }) {
           streamingIndexRef.current = -1;
         },
         // onAudio — queue playback
-        (base64Audio) => {
+        (base64Audio: string) => {
           audioQueueRef.current.push(base64Audio);
           playNextAudio();
         }

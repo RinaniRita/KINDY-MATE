@@ -139,3 +139,52 @@ export async function apiPostWithStatus<T>(
     data,
   };
 }
+export async function apiStream(
+  path: string,
+  body: Record<string, unknown>,
+  onChunk: (text: string) => void,
+  onDone: () => void,
+  onAudio?: (base64: string) => void,
+): Promise<void> {
+  const session = readAuthSession();
+  const token = session?.access || null;
+  const url = `${API_BASE}${path}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok || !response.body) throw new Error(`Stream failed: ${response.status}`);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const parsed = JSON.parse(line.slice(6)) as { chunk?: string; audio?: string; done: boolean };
+          if (parsed.chunk) onChunk(parsed.chunk);
+          if (parsed.audio && onAudio) onAudio(parsed.audio);
+          if (parsed.done) {
+            onDone();
+            return;
+          }
+        } catch {
+          /* ignore malformed */
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  onDone();
+}
