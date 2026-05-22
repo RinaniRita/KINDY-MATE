@@ -309,13 +309,21 @@ class Command(BaseCommand):
             ended_at=child.created_at,
             notes='Seeded reading activity.',
         )
-        EntertainmentSession.objects.get_or_create(
+        entertainment_seed = EntertainmentSession.objects.filter(
             child=child,
             status=EntertainmentSession.Status.COMPLETED,
             duration_minutes_allowed=5,
             duration_minutes_actual=5,
             points_spent=10,
-        )
+        ).order_by('id').first()
+        if not entertainment_seed:
+            EntertainmentSession.objects.create(
+                child=child,
+                status=EntertainmentSession.Status.COMPLETED,
+                duration_minutes_allowed=5,
+                duration_minutes_actual=5,
+                points_spent=10,
+            )
         ActivityLog.objects.get_or_create(
             child=child,
             event_type='seeded_demo_activity',
