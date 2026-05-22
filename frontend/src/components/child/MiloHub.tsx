@@ -410,7 +410,7 @@ export function MiloHub({ childId }: { childId: string }) {
             <div className="mt-4 grid grid-cols-3 gap-3">
               <div className="child-island-card rounded-[1.6rem] px-4 py-4">
                 <p className="relative z-10 text-2xl font-black text-slate-800">
-                  {dashboard?.wallet.points_balance ?? child.wallet_balance}
+                  {dashboard?.wallet?.points_balance ?? child.wallet_balance}
                 </p>
                 <p className="relative z-10 text-xs font-bold text-slate-500">Điểm</p>
               </div>

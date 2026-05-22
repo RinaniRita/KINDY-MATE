@@ -175,7 +175,7 @@ export function ChildHome({ childId }: { childId: string }) {
       <section className="absolute left-0 right-0 top-0 z-20 px-4 py-4 md:px-6 md:py-5">
         <div className="mx-auto flex max-w-7xl justify-end">
           <div className="flex flex-wrap gap-2">
-            <span className="child-mini-badge">⭐ {dashboard?.wallet.points_balance ?? child.wallet_balance} điểm</span>
+            <span className="child-mini-badge">⭐ {dashboard?.wallet?.points_balance ?? child.wallet_balance} điểm</span>
             <span className="child-mini-badge">⏱️ {dashboard?.metrics.cap_left_today ?? 0} phút còn lại</span>
             <span className="child-mini-badge">🌼 {dashboard?.metrics.mission_completion_count ?? 0} việc xong</span>
           </div>

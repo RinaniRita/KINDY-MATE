@@ -509,6 +509,11 @@ def dashboard(request):
                 'nickname': child.nickname,
                 'age': child.age,
             },
+            'wallet': {
+                'points_balance': child.wallet.points_balance,
+                'points_earned_total': child.wallet.points_earned_total,
+                'points_spent_total': child.wallet.points_spent_total,
+            },
             'report_date': str(base_date),
             'start_date': str(start_date) if start_date else None,
             'end_date': str(end_date) if end_date else None,
