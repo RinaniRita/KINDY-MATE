@@ -10,6 +10,12 @@ import { MascotVisual } from "./MascotVisual";
 import { EnglishAnimalsMission } from "./missions/EnglishAnimalsMission";
 import { MathPicturesMission } from "./missions/MathPicturesMission";
 import type { MissionData } from "./types";
+import dynamic from "next/dynamic";
+
+const JumpingJackTracker = dynamic(
+  () => import("./JumpingJackTracker").then((mod) => mod.JumpingJackTracker),
+  { ssr: false }
+);
 
 type CompletionResponse = {
   wallet: {
@@ -65,18 +71,18 @@ const fallbackMissions: MissionData[] = [
   },
   {
     id: "3",
-    mission_type: "learning",
-    mission_type_label: "Học tập",
-    display_category: "ky_nang_song",
-    display_category_label: "Toán Học Vui",
-    title: "Đếm hình động vật vui nhộn",
-    description: "Cùng Milo giải các câu đố cộng trừ bằng hình ảnh hoạt họa ngộ nghĩnh và vui mắt nhé!",
-    points_reward: 10,
-    estimated_duration_minutes: 5,
+    mission_type: "movement",
+    mission_type_label: "Vận động",
+    display_category: "van_dong",
+    display_category_label: "Thử Thách Vận Động",
+    title: "Thử thách Jumping Jacks",
+    description: "Cùng Milo bật nhảy 10 cái Jumping Jacks thật chính xác nhé! Camera AI sẽ đếm giúp cậu.",
+    points_reward: 20,
+    estimated_duration_minutes: 3,
     requires_voice: false,
-    requires_camera: false,
-    verification_method: "Giải đố toán học",
-    safety_notes: "Dùng nháp nhẩm tính cẩn thận.",
+    requires_camera: true,
+    verification_method: "AI đếm số lần nhảy",
+    safety_notes: "Hãy đứng xa điện thoại một chút, đứng vào khung hình và đảm bảo không vướng đồ vật nhé.",
   }
 ];
 
@@ -481,6 +487,17 @@ export function MissionDetail({ childId, missionId }: { childId: string; mission
                   )}
                 </div>
               </div>
+            ) : String(missionId) === "3" ? (
+              <div className="space-y-6 mt-4">
+                <JumpingJackTracker
+                  targetCount={10}
+                  onCountUpdate={(c) => {
+                    if (c >= 10 && !completed && !saving) {
+                      handleComplete();
+                    }
+                  }}
+                />
+              </div>
             ) : mission.title === "English Animals & Colors" ? (
               <EnglishAnimalsMission />
             ) : mission.title === "Phép cộng trừ bằng hình ảnh" ? (
@@ -528,6 +545,16 @@ export function MissionDetail({ childId, missionId }: { childId: string; mission
                 }`}
               >
                 {completed ? "Milo đã ghi nhận điểm cho cậu! 🎉" : "Hãy tải ảnh/chụp ảnh bài ở trên để nộp nhé!"}
+              </button>
+            ) : String(missionId) === "3" ? (
+              <button
+                type="button"
+                disabled
+                className={`min-h-12 rounded-[1.5rem] px-5 text-sm font-black shadow-md ${
+                  completed ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-450 border border-slate-200"
+                }`}
+              >
+                {completed ? "Milo đã ghi nhận điểm cho cậu! 🎉" : "Hãy nhảy đủ 10 cái để tự động hoàn thành nhé!"}
               </button>
             ) : (
               <button

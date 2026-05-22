@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/api/ai/:path*",
+        destination: "http://host.docker.internal:8001/:path*", // Proxy to standalone Python script on host
+      },
+      {
         source: "/api/:path*",
         destination: "http://backend:8000/api/:path*/", // Force trailing slash for Django
       },
