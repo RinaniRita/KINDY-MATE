@@ -1,28 +1,25 @@
-type ChildEntryCallback = (childId: string) => void;
+const OPEN_CHILD_ENTRY_EVENT = "kindy-mate:open-child-entry";
 
-const listeners = new Set<ChildEntryCallback>();
-
-/**
- * Triggers a child entry request event.
- * Used by sibling components to request opening the child entry modal.
- */
-export function triggerChildEntry(childId: string): void {
-  listeners.forEach((callback) => {
-    try {
-      callback(childId);
-    } catch (error) {
-      console.error("Error in triggerChildEntry listener:", error);
-    }
-  });
+export function triggerChildEntry(childId?: string) {
+  if (typeof window === "undefined") return;
+  if (childId) {
+    window.localStorage.setItem("active_child_id", childId);
+  }
+  window.dispatchEvent(
+    new CustomEvent(OPEN_CHILD_ENTRY_EVENT, {
+      detail: { childId: childId ?? "" },
+    }),
+  );
 }
 
-/**
- * Subscribes to child entry request events.
- * Returns a cleanup function to unsubscribe.
- */
-export function onChildEntryRequest(callback: ChildEntryCallback): () => void {
-  listeners.add(callback);
-  return () => {
-    listeners.delete(callback);
+export function onChildEntryRequest(listener: (childId?: string) => void) {
+  if (typeof window === "undefined") return () => {};
+
+  const handler = (event: Event) => {
+    const customEvent = event as CustomEvent<{ childId?: string }>;
+    listener(customEvent.detail?.childId);
   };
+
+  window.addEventListener(OPEN_CHILD_ENTRY_EVENT, handler as EventListener);
+  return () => window.removeEventListener(OPEN_CHILD_ENTRY_EVENT, handler as EventListener);
 }

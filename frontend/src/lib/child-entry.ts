@@ -1,5 +1,5 @@
-export function prepareChildEntry(childId: string): void {
+export function prepareChildEntry(childId: string) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem("active_child_id", childId);
-  window.localStorage.setItem("child_entry_nonce", Math.random().toString(36).substring(2, 11));
+  window.localStorage.setItem("child_entry_nonce", String(Date.now()));
 }

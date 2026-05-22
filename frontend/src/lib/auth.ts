@@ -1,10 +1,10 @@
-import { AuthResponse } from "./api";
+import type { AuthResponse } from "@/lib/api";
 
-const AUTH_KEY = "kindy_mate_auth_session";
+const AUTH_KEY = "kindy_mate_auth";
 
-export function saveAuthSession(session: AuthResponse): void {
+export function saveAuthSession(auth: AuthResponse) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  window.localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
 }
 
 export function readAuthSession(): AuthResponse | null {
@@ -14,21 +14,18 @@ export function readAuthSession(): AuthResponse | null {
   try {
     return JSON.parse(raw) as AuthResponse;
   } catch {
+    window.localStorage.removeItem(AUTH_KEY);
     return null;
   }
 }
 
-export function clearAuthSession(): void {
+export function clearAuthSession() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(AUTH_KEY);
-  window.localStorage.removeItem("active_child_id");
 }
 
-export function updateAuthUser(user: Partial<AuthResponse["user"]>): void {
-  if (typeof window === "undefined") return;
-  const current = readAuthSession();
-  if (current) {
-    current.user = { ...current.user, ...user };
-    saveAuthSession(current);
-  }
+export function updateAuthUser(user: AuthResponse["user"]) {
+  const session = readAuthSession();
+  if (!session) return;
+  saveAuthSession({ ...session, user });
 }
