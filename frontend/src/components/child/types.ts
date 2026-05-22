@@ -35,6 +35,8 @@ export type ChildDashboardData = {
   rules: {
     daily_entertainment_cap_minutes: number;
     entertainment_paused: boolean;
+    bedtime_lock_start?: string | null;
+    bedtime_lock_end?: string | null;
     voice_enabled: boolean;
     camera_enabled: boolean;
   };

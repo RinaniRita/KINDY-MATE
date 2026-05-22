@@ -81,7 +81,7 @@ const pageMeta = [
   { match: "/parent/profile/faqs", title: "Câu hỏi thường gặp", subtitle: "Giải thích ngắn gọn các giới hạn thời gian và cách dùng an toàn." },
   { match: "/parent/profile", title: "Tài khoản phụ huynh", subtitle: "Cập nhật hồ sơ, ảnh đại diện và thông tin đăng nhập." },
   { match: "/parent/settings", title: "Cài đặt chung", subtitle: "PIN phụ huynh, dữ liệu, quyền riêng tư và ngôn ngữ." },
-  { match: "/parent/insights", title: "Hỏi AI", subtitle: "Hỏi nhanh về dữ liệu của con mà không cần đọc toàn bộ báo cáo." },
+  { match: "/parent/insights", title: "Trợ lý phụ huynh", subtitle: "Hỏi nhanh về dữ liệu của con mà không cần đọc toàn bộ báo cáo." },
 ];
 
 function parentTitle(pathname: string | null) {
@@ -528,7 +528,7 @@ export function ParentShell({ children }: ParentShellProps) {
               }`}
             >
               <AskAiGlyph />
-              {desktopExpanded ? <span>Hỏi AI</span> : null}
+              {desktopExpanded ? <span>Trợ lý phụ huynh</span> : null}
             </button>
             <button
               type="button"
@@ -616,7 +616,7 @@ export function ParentShell({ children }: ParentShellProps) {
                 onClick={() => navigateTo("/parent/insights")}
                 className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-2 text-xs font-black tracking-[-0.01em] text-sky-700"
               >
-                Hỏi AI
+                Trợ lý phụ huynh
               </button>
               <button
                 type="button"
@@ -677,7 +677,7 @@ export function ParentShell({ children }: ParentShellProps) {
                 className={`${actionButtonClass} border border-sky-100 bg-sky-50 text-left text-sky-700`}
               >
                 <AskAiGlyph />
-                <span>Hỏi AI</span>
+                <span>Trợ lý phụ huynh</span>
               </button>
               <button
                 type="button"
@@ -736,7 +736,7 @@ export function ParentShell({ children }: ParentShellProps) {
           }`}
         >
           <AskAiGlyph className="h-[16px] w-[16px]" />
-          <span className={showInsightsFab ? "inline" : "hidden"}>Hỏi AI</span>
+          <span className={showInsightsFab ? "inline" : "hidden"}>Trợ lý phụ huynh</span>
         </button>
       ) : null}
 

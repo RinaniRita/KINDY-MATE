@@ -40,6 +40,7 @@ type DashboardData = {
   rules: {
     voice_enabled: boolean;
     camera_enabled: boolean;
+    entertainment_paused: boolean;
     session_duration_limit_minutes: number;
     total_screen_time_limit_minutes: number;
     continuous_screen_time_limit_minutes: number;
@@ -202,9 +203,18 @@ function BreakdownBars({ items }: { items: BreakdownItem[] }) {
   );
 }
 
+function getTodayString() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function ParentDashboard() {
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => getTodayString());
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -236,8 +246,8 @@ export function ParentDashboard() {
       setError("");
       try {
         const [data, hourly] = await Promise.all([
-          apiGetRequired<DashboardData>(`/activity/dashboard/?child_id=${selectedChildId}`),
-          apiGet<{ hours: HourlyData[] }>(`/activity/hourly-usage/?child_id=${selectedChildId}`, { hours: [] }),
+          apiGetRequired<DashboardData>(`/activity/dashboard/?child_id=${selectedChildId}&date=${selectedDate}`),
+          apiGet<{ hours: HourlyData[] }>(`/activity/hourly-usage/?child_id=${selectedChildId}&date=${selectedDate}`, { hours: [] }),
         ]);
         setDashboard(data);
         setHourlyData(hourly.hours || []);
@@ -253,7 +263,7 @@ export function ParentDashboard() {
       }
     }
     void loadDashboard();
-  }, [selectedChildId]);
+  }, [selectedChildId, selectedDate]);
 
   const latestFinishedSession = useMemo(
     () => dashboard?.recent_sessions.find((session) => session.status !== "active") ?? null,
@@ -321,14 +331,21 @@ export function ParentDashboard() {
         <span className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700">
           Phiên tối đa {dashboard.rules.session_duration_limit_minutes} phút
         </span>
-        <span className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600">
-          Dữ liệu ngày {formatDateOnly(dashboard.report_date)}
-        </span>
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600">
+          <span>Dữ liệu ngày:</span>
+          <input
+            type="date"
+            max={getTodayString()}
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
+            className="border-none bg-transparent font-black text-slate-700 outline-none"
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <div className="grid gap-6">
-          <Panel eyebrow="Ảnh chụp ngày gần nhất" title="Nhịp hoạt động trong phiên hoặc ngày gần nhất">
+          <Panel eyebrow="Tóm tắt ngày gần nhất" title="Các chỉ số chính của phiên hoặc ngày gần nhất">
             <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Metric label="Tổng thời gian app" value={`${dashboard.metrics.total_app_minutes} phút`} variant="purple" />
               <Metric label="Thời gian màn hình" value={`${dashboard.metrics.screen_time_minutes} phút`} variant="blue" />
@@ -390,11 +407,6 @@ export function ParentDashboard() {
                   </p>
                 </div>
 
-                {dashboard.current_session ? (
-                  <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-sm font-bold leading-6 text-slate-700">
-                    Hiện đang có một phiên mở trong khu trẻ em. Báo cáo tổng hợp sẽ chốt lại đầy đủ khi phiên này kết thúc.
-                  </div>
-                ) : null}
               </div>
             ) : (
               <p className="text-sm font-semibold text-slate-500">

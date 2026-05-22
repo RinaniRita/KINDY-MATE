@@ -793,9 +793,6 @@ class Command(BaseCommand):
         create_log(mina, when=mina_today_1 + timedelta(minutes=20), event_type="movement_completed", event_category="movement", duration_seconds=300, metadata={"source": "seed_demo"})
         create_log(mina, when=now - timedelta(minutes=3), event_type="reward_blocked", event_category="safety", duration_seconds=0, metadata={"source": "seed_demo", "reason": "not_enough_points"})
 
-        create_alert(mina, when=now - timedelta(hours=5), alert_type="daily_cap_info", severity=ParentAlert.Severity.INFO, message="Hôm nay Mina đã có đủ học tập, đọc sách và một khoảng vận động ngắn.")
-        create_alert(mina, when=now - timedelta(minutes=2), alert_type="not_enough_points", severity=ParentAlert.Severity.INFO, message="Mina vừa thử mở một phần thưởng nhưng chưa đủ điểm. Bạn có thể gợi ý một nhiệm vụ đọc ngắn.", is_read=False)
-
         # Nấm: dữ liệu nhẹ hơn để danh sách trẻ không trống trải
         bap_start = now - timedelta(days=1, hours=4)
         create_usage(

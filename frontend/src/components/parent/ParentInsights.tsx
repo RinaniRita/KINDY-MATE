@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Panel } from "@/components/common/Cards";
-import { apiGetRequired } from "@/lib/api";
+import { apiGetRequired, apiPostRequired } from "@/lib/api";
 
 type ChildProfile = {
   id: string;
@@ -45,13 +45,31 @@ type DashboardData = {
     content_title?: string;
     started_at: string;
   } | null;
+  recent_sessions?: Array<{
+    id: string;
+    content_title?: string;
+    notes: string;
+    duration_minutes: number;
+    activity_category: string;
+    display_category: string;
+    started_at: string;
+    ended_at?: string | null;
+  }>;
 };
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
-  source?: "dashboard" | "reports";
   link?: string;
+  status?: "success" | "fallback";
+};
+
+type InsightsResponse = {
+  reply: string;
+  status: "success" | "fallback";
+  source_scope: string;
+  link_target?: string;
+  detail?: string;
 };
 
 const starterQuestions = [
@@ -59,114 +77,51 @@ const starterQuestions = [
   "Phiên gần nhất của con có gì đáng chú ý?",
   "Tuần này xu hướng dùng app của con ra sao?",
   "Con đang thiên về hoạt động chủ động hay thụ động?",
-  "Có điều gì phụ huynh nên chú ý không?",
 ];
 
-const diagnosisKeywords = ["nghiện", "tâm lý", "trầm cảm", "adhd", "bệnh", "rối loạn", "thiếu tập trung", "chẩn đoán"];
+function buildPresetAnswer(question: string, dashboard: DashboardData): { reply: string; link: string } | null {
+  const childName = dashboard.child.nickname;
+  const reportDate = new Date(dashboard.report_date).toLocaleDateString("vi-VN");
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function hasEnoughData(data: DashboardData) {
-  return data.weekly_metrics.total_app_minutes > 0 || data.metrics.total_app_minutes > 0;
-}
-
-function buildAnswer(question: string, data: DashboardData): ChatMessage {
-  const normalized = question.toLowerCase();
-
-  if (diagnosisKeywords.some((keyword) => normalized.includes(keyword))) {
+  if (question === "Hôm nay con dùng app bao lâu rồi?") {
     return {
-      role: "assistant",
-      content:
-        "Tôi không thể chẩn đoán hay gắn nhãn tâm lý hoặc y tế cho trẻ. Tôi chỉ có thể tóm tắt dữ liệu hoạt động và thời gian dùng app hiện có.",
-      source: "reports",
-      link: "/parent/reports",
-    };
-  }
-
-  if (!hasEnoughData(data)) {
-    return {
-      role: "assistant",
-      content:
-        "Hiện chưa có đủ dữ liệu trong tuần này để kết luận xu hướng. Bạn có thể xem lại sau khi bé dùng app thêm vài phiên.",
-      source: "reports",
-      link: "/parent/reports",
-    };
-  }
-
-  if (normalized.includes("bao lâu") || normalized.includes("bao nhiêu") || normalized.includes("thời gian")) {
-    return {
-      role: "assistant",
-      content: `Dựa trên dữ liệu ngày ${new Date(data.report_date).toLocaleDateString("vi-VN")}, ${data.child.nickname} đã dùng app ${data.metrics.total_app_minutes} phút, trong đó ${data.metrics.screen_time_minutes} phút trên màn hình và ${data.metrics.offscreen_time_minutes} phút ngoài màn hình.`,
-      source: "dashboard",
+      reply: `Dựa trên dữ liệu ngày ${reportDate}, ${childName} đã dùng app ${dashboard.metrics.total_app_minutes} phút, trong đó ${dashboard.metrics.screen_time_minutes} phút trên màn hình và ${dashboard.metrics.offscreen_time_minutes} phút ngoài màn hình.`,
       link: "/parent/dashboard",
     };
   }
 
-  if (normalized.includes("phiên gần nhất") || normalized.includes("vừa dùng") || normalized.includes("vừa rồi")) {
+  if (question === "Phiên gần nhất của con có gì đáng chú ý?") {
+    const latest = dashboard.latest_activity;
+    if (!latest) {
+      return {
+        reply: `Hiện chưa có phiên gần đây đủ dữ liệu để tóm tắt cho ${childName}.`,
+        link: "/parent/dashboard",
+      };
+    }
+    const title = latest.content_title || latest.notes || "một hoạt động trong app";
     return {
-      role: "assistant",
-      content: data.latest_activity
-        ? `Phiên gần nhất tôi ghi nhận là "${data.latest_activity.content_title || data.latest_activity.notes || "một hoạt động trong app"}" vào ${formatDateTime(data.latest_activity.started_at)}, kéo dài ${data.latest_activity.duration_minutes} phút.`
-        : `Hiện tôi chưa có phiên hoàn chỉnh nào gần đây của ${data.child.nickname}.`,
-      source: "dashboard",
+      reply: `Phiên gần nhất của ${childName} là "${title}", kéo dài ${latest.duration_minutes} phút. ${latest.notes || "Đây là hoạt động mới nhất đã được ghi nhận."}`,
       link: "/parent/dashboard",
     };
   }
 
-  if (normalized.includes("đang làm gì") || normalized.includes("hiện tại") || normalized.includes("bây giờ")) {
+  if (question === "Tuần này xu hướng dùng app của con ra sao?") {
     return {
-      role: "assistant",
-      content: data.current_session
-        ? `${data.child.nickname} đang ở "${data.current_session.current_activity_title || "một hoạt động trong app"}". Phiên hiện tại đã kéo dài ${data.current_session.current_session_minutes} phút.`
-        : `${data.child.nickname} hiện chưa có phiên khu trẻ em nào đang mở.`,
-      source: "dashboard",
-      link: "/parent/dashboard",
-    };
-  }
-
-  if (normalized.includes("chủ động") || normalized.includes("thụ động")) {
-    return {
-      role: "assistant",
-      content: `Trong 7 ngày gần đây, ${data.child.nickname} có ${data.weekly_metrics.active_minutes} phút hoạt động chủ động và ${data.weekly_metrics.passive_minutes} phút nội dung thụ động. ${data.eda_highlights[0] || ""}`.trim(),
-      source: "reports",
+      reply:
+        dashboard.weekly_summary ||
+        `Trong 7 ngày gần đây, ${childName} đã có ${dashboard.weekly_metrics.total_app_minutes} phút dùng app và ${dashboard.weekly_metrics.completed_activity_count} hoạt động được ghi nhận.`,
       link: "/parent/reports",
     };
   }
 
-  if (normalized.includes("an toàn") || normalized.includes("chú ý") || normalized.includes("cảnh báo")) {
+  if (question === "Con đang thiên về hoạt động chủ động hay thụ động?") {
     return {
-      role: "assistant",
-      content: data.alerts.length
-        ? `Hiện có ${data.alerts.length} ghi chú dành cho phụ huynh. Mục nổi bật nhất là: ${data.alerts[0]}`
-        : "Hiện chưa có ghi chú an toàn mới trong dashboard.",
-      source: "dashboard",
-      link: "/parent/dashboard",
-    };
-  }
-
-  if (normalized.includes("tuần") || normalized.includes("xu hướng") || normalized.includes("báo cáo")) {
-    return {
-      role: "assistant",
-      content: data.weekly_summary,
-      source: "reports",
+      reply: `Trong 7 ngày gần đây, ${childName} có ${dashboard.weekly_metrics.active_minutes} phút hoạt động chủ động và ${dashboard.weekly_metrics.passive_minutes} phút nội dung thụ động.`,
       link: "/parent/reports",
     };
   }
 
-  return {
-    role: "assistant",
-    content:
-      "Tôi có thể tóm tắt thời gian dùng app, phiên gần nhất, xu hướng 7 ngày, tỷ lệ hoạt động chủ động hoặc thụ động và các ghi chú dành cho phụ huynh.",
-    source: "reports",
-    link: "/parent/reports",
-  };
+  return null;
 }
 
 export function ParentInsights() {
@@ -178,12 +133,13 @@ export function ParentInsights() {
     {
       role: "assistant",
       content:
-        "Tôi chỉ trả lời dựa trên dashboard, báo cáo và lịch sử phiên hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
-      source: "reports",
+        "Tôi chỉ trả lời dựa trên dashboard, báo cáo và lịch sử hoạt động hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
       link: "/parent/reports",
+      status: "success",
     },
   ]);
   const [loading, setLoading] = useState(true);
+  const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -213,9 +169,9 @@ export function ParentInsights() {
         {
           role: "assistant",
           content:
-            "Tôi chỉ trả lời dựa trên dashboard, báo cáo và lịch sử phiên hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
-          source: "reports",
+            "Tôi chỉ trả lời dựa trên dashboard, báo cáo và lịch sử hoạt động hiện có của con. Nếu dữ liệu chưa đủ, tôi sẽ nói rõ điều đó.",
           link: "/parent/reports",
+          status: "success",
         },
       ]);
       try {
@@ -234,21 +190,73 @@ export function ParentInsights() {
     void loadDashboard();
   }, [selectedChildId]);
 
-  const suggestionButtons = useMemo(() => starterQuestions.slice(0, 4), []);
+  const suggestionButtons = useMemo(() => starterQuestions, []);
 
-  function ask(question: string) {
+  async function ask(question: string) {
     if (!dashboard) return;
     const trimmed = question.trim();
-    if (!trimmed) return;
-    setMessages((current) => [...current, { role: "user", content: trimmed }, buildAnswer(trimmed, dashboard)]);
+    if (!trimmed || asking) return;
+
+    setAsking(true);
+    setMessages((current) => [...current, { role: "user", content: trimmed }]);
     setDraft("");
+
+    const presetAnswer = buildPresetAnswer(trimmed, dashboard);
+    if (presetAnswer) {
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: presetAnswer.reply,
+          link: presetAnswer.link,
+          status: "success",
+        },
+      ]);
+      setAsking(false);
+      return;
+    }
+
+    try {
+      const history = messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+      const response = await apiPostRequired<InsightsResponse>("/parent-insights/", {
+        child_id: selectedChildId,
+        message: trimmed,
+        history,
+        context: dashboard,
+      });
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: response.reply,
+          link: response.link_target,
+          status: response.status,
+        },
+      ]);
+    } catch (err) {
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: err instanceof Error ? err.message : "Không thể lấy phản hồi từ trợ lý phụ huynh.",
+          link: "/parent/reports",
+          status: "fallback",
+        },
+      ]);
+    } finally {
+      setAsking(false);
+    }
   }
 
   return (
     <div className="grid gap-6 py-4 xl:grid-cols-[0.72fr_1.28fr]">
-      <Panel eyebrow="Hỏi AI" title="Trợ lý dữ liệu cho phụ huynh">
+      <Panel eyebrow="Trợ lý phụ huynh" title="Hỏi nhanh từ dữ liệu của con">
         <p className="text-sm font-semibold leading-7 text-slate-600">
-          Hỏi nhanh về thời gian dùng app, phiên gần nhất, xu hướng 7 ngày và các ghi chú quan trọng mà không cần đọc toàn bộ báo cáo.
+          Hỏi nhanh về thời gian dùng app, phiên gần nhất, xu hướng 7 ngày và các ghi chú quan trọng mà không cần đọc
+          toàn bộ báo cáo.
         </p>
 
         <label className="mt-5 grid gap-2 text-sm font-black text-slate-700">
@@ -271,7 +279,7 @@ export function ParentInsights() {
             <button
               key={question}
               type="button"
-              onClick={() => ask(question)}
+              onClick={() => void ask(question)}
               className="rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-left text-sm font-bold text-slate-700 shadow-sm"
             >
               {question}
@@ -288,7 +296,7 @@ export function ParentInsights() {
         ) : null}
       </Panel>
 
-      <Panel eyebrow="Trò chuyện" title="Dữ liệu đã tuyển chọn">
+      <Panel eyebrow="Trợ lý phụ huynh" title="Dữ liệu đã tuyển chọn">
         {loading ? (
           <p className="text-sm font-semibold text-slate-500">Đang tải dữ liệu để trả lời.</p>
         ) : error ? (
@@ -308,8 +316,11 @@ export function ParentInsights() {
                   <p className="font-semibold">{message.content}</p>
                   {message.role === "assistant" && message.link ? (
                     <a href={message.link} className="mt-2 inline-flex text-xs font-black text-sky-700 underline">
-                      {message.source === "reports" ? "Xem chi tiết trong Báo cáo" : "Xem chi tiết trong Tổng quan"}
+                      {message.link.includes("/reports") ? "Xem chi tiết trong Báo cáo" : "Xem chi tiết trong Tổng quan"}
                     </a>
+                  ) : null}
+                  {message.role === "assistant" && message.status === "fallback" ? (
+                    <p className="mt-2 text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">Chế độ dự phòng</p>
                   ) : null}
                 </div>
               ))}
@@ -324,10 +335,11 @@ export function ParentInsights() {
               />
               <button
                 type="button"
-                onClick={() => ask(draft)}
-                className="justify-self-end rounded-2xl bg-slate-800 px-5 py-3 text-sm font-black text-white"
+                onClick={() => void ask(draft)}
+                disabled={asking}
+                className="justify-self-end rounded-2xl bg-slate-800 px-5 py-3 text-sm font-black text-white disabled:opacity-60"
               >
-                Gửi câu hỏi
+                {asking ? "Đang hỏi..." : "Gửi câu hỏi"}
               </button>
             </div>
           </>

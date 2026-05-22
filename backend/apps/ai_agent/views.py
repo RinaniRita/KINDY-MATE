@@ -1,7 +1,6 @@
 import json
 import os
 import random
-import urllib.error
 import urllib.request
 
 from rest_framework import status
@@ -28,7 +27,7 @@ def _build_ollama_urls():
     return urls
 
 
-def _post_to_ollama(model: str, messages: list[dict], *, temperature: float, num_predict: int, timeout: int = 6):
+def _post_to_ollama(model: str, messages: list[dict], *, temperature: float, num_predict: int, timeout: int):
     last_err = None
     for url in _build_ollama_urls():
         try:
@@ -66,9 +65,12 @@ def _fallback_parent_insight(message: str, child: ChildProfile, context: dict) -
 
     normalized = (message or "").lower()
 
-    if any(keyword in normalized for keyword in ["nghiện", "tâm lý", "trầm cảm", "adhd", "bệnh", "rối loạn", "chẩn đoán"]):
+    if any(
+        keyword in normalized
+        for keyword in ["nghiện", "tâm lý", "trầm cảm", "adhd", "bệnh", "rối loạn", "thiếu tập trung", "chẩn đoán"]
+    ):
         return (
-            "Tôi không thể chẩn đoán hay gắn nhãn tâm lý hoặc y tế cho trẻ. Tôi chỉ có thể tóm tắt dữ liệu hoạt động trong app hiện có.",
+            "Tôi không thể chẩn đoán hay gắn nhãn tâm lý hoặc y tế cho trẻ. Tôi chỉ có thể tóm tắt dữ liệu hoạt động hiện có trong app.",
             "/parent/reports",
         )
 
@@ -183,17 +185,17 @@ class MiloChatView(APIView):
         messages.append({"role": "user", "content": message})
 
         ollama_response, last_err = _post_to_ollama(
-            "gemma4:e2b",
+            "qwen2.5:7b",
             messages,
             temperature=0.7,
-            num_predict=120,
-            timeout=8,
+            num_predict=160,
+            timeout=20,
         )
 
         if not ollama_response:
             fallback_replies = [
                 f"Ôi, Milo đang hơi buồn ngủ một tí rồi {nickname} ơi. Cậu đi học bài hoặc tập thể dục một tí rồi quay lại trò chuyện với tớ nhé.",
-                f"Tớ rất vui được trò chuyện với cậu. Nhưng hình như tớ đang bận đi dọn phòng ngủ rồi, hẹn bé {nickname} một lát nữa nhé.",
+                f"Tớ rất vui được trò chuyện với cậu. Nhưng hình như tớ đang bận đi dọn phòng rồi, hẹn bé {nickname} một lát nữa nhé.",
                 f"Bé {nickname} ơi, cậu hôm nay thật tuyệt vời. Milo chúc cậu một ngày học tập thật nhiều niềm vui nhé.",
             ]
             return Response(
@@ -225,17 +227,28 @@ class ParentInsightsView(APIView):
         except ChildProfile.DoesNotExist:
             return Response({"detail": "Không tìm thấy hồ sơ trẻ."}, status=status.HTTP_404_NOT_FOUND)
 
-        system_prompt = f"""
-Bạn là trợ lý dữ liệu dành cho phụ huynh của Kindy-Mate.
+        system_prompt = """
+Bạn là Trợ lý phụ huynh của Kindy-Mate.
 
-Phạm vi bắt buộc:
-- Chỉ trả lời dựa trên dữ liệu dashboard, báo cáo, recent sessions và alerts được cung cấp.
-- Không chẩn đoán y tế, tâm lý, hành vi bệnh lý hay nói trẻ "nghiện".
+Nhiệm vụ duy nhất:
+- Tóm tắt và giải thích dữ liệu hoạt động của trẻ trong Kindy-Mate cho phụ huynh.
+
+Phạm vi được phép dùng:
+- dashboard
+- báo cáo
+- recent sessions
+- alerts
+
+Ràng buộc bắt buộc:
+- Chỉ trả lời dựa trên dữ liệu được cung cấp trong request.
+- Không bịa thêm số liệu, không đoán ngoài dữ liệu.
+- Không chẩn đoán y tế, tâm lý, hành vi bệnh lý và không dùng từ "nghiện".
 - Nếu dữ liệu chưa đủ, phải nói rõ là chưa đủ dữ liệu.
-- Không bịa thêm số liệu.
-- Trả lời ngắn, rõ, bằng tiếng Việt.
-- Khi phù hợp, mở đầu bằng kiểu: "Dựa trên dữ liệu ngày..." hoặc "Trong 7 ngày gần đây...".
-- Không nhắc tới chat history của trẻ, vì hệ thống này không dùng free-chat của trẻ cho phân tích phụ huynh.
+- Trả lời bằng tiếng Việt, ngắn, rõ, thực dụng.
+- Không viết suy nghĩ nội bộ, không giải thích chuỗi lập luận.
+- Nếu phù hợp, mở đầu bằng "Dựa trên dữ liệu ngày..." hoặc "Trong 7 ngày gần đây...".
+- Không nói về kiến thức ngoài dự án, không tư vấn chung chung ngoài dữ liệu hiện có.
+- Không nhắc tới chat history của trẻ; hệ thống này không dùng free-chat của trẻ cho phân tích phụ huynh.
 """.strip()
 
         context_text = json.dumps(
@@ -261,11 +274,11 @@ Phạm vi bắt buộc:
         messages.append({"role": "user", "content": message})
 
         ollama_response, last_err = _post_to_ollama(
-            "gemma4:e2b",
+            "qwen2.5:7b",
             messages,
-            temperature=0.2,
-            num_predict=220,
-            timeout=8,
+            temperature=0.15,
+            num_predict=180,
+            timeout=18,
         )
 
         if not ollama_response:
@@ -293,7 +306,11 @@ Phạm vi bắt buộc:
                 }
             )
 
-        link_target = "/parent/reports" if any(token in message.lower() for token in ["tuần", "xu hướng", "chủ động", "thụ động"]) else "/parent/dashboard"
+        link_target = (
+            "/parent/reports"
+            if any(token in message.lower() for token in ["tuần", "xu hướng", "chủ động", "thụ động"])
+            else "/parent/dashboard"
+        )
         return Response(
             {
                 "reply": reply,

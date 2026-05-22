@@ -70,7 +70,9 @@ def _session_duration_for_reporting(session, now):
         return max(session.duration_minutes, 0)
     if not session.started_at:
         return max(session.duration_minutes, 0)
-    return _elapsed_minutes(session.started_at, now)
+    if session.status == UsageSession.Status.ACTIVE:
+        return min(_elapsed_minutes(session.started_at, now), 180)
+    return max(session.duration_minutes, 0)
 
 
 def _empty_breakdown():
@@ -145,6 +147,46 @@ def _build_daily_series(sessions, today, now):
     return list(day_map.values())
 
 
+def _build_daily_series_for_range(sessions, start_date, end_date, now):
+    day_map = {}
+    current_day = start_date
+    while current_day <= end_date:
+        day_map[current_day] = {
+            'date': str(current_day),
+            'label': current_day.strftime('%d/%m'),
+            'weekday': current_day.strftime('%a'),
+            'total_minutes': 0,
+            'screen_minutes': 0,
+            'offscreen_minutes': 0,
+            'active_minutes': 0,
+            'passive_minutes': 0,
+        }
+        current_day += timedelta(days=1)
+
+    for session in sessions:
+        if session.status == UsageSession.Status.BLOCKED or not session.started_at:
+            continue
+        session_day = timezone.localtime(session.started_at).date()
+        if session_day not in day_map:
+            continue
+        minutes = _session_duration_for_reporting(session, now)
+        if minutes <= 0:
+            continue
+        bucket = _activity_bucket(session)
+        target = day_map[session_day]
+        target['total_minutes'] += minutes
+        if bucket in SCREEN_ACTIVITY_KEYS:
+            target['screen_minutes'] += minutes
+        if bucket in OFFSCREEN_ACTIVITY_KEYS:
+            target['offscreen_minutes'] += minutes
+        if bucket in ACTIVE_ACTIVITY_KEYS:
+            target['active_minutes'] += minutes
+        if bucket in PASSIVE_ACTIVITY_KEYS:
+            target['passive_minutes'] += minutes
+
+    return list(day_map.values())
+
+
 def _activity_bucket(session):
     if session.activity_category:
         return session.activity_category
@@ -162,8 +204,8 @@ def _activity_bucket(session):
     return mapping.get(session.session_type, session.session_type)
 
 
-def _build_hourly_breakdown(sessions, now):
-    day_start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
+def _build_hourly_breakdown(sessions, report_date, now):
+    day_start = timezone.make_aware(datetime.combine(report_date, time.min))
     hours = [
         {
             'hour': hour,
@@ -286,6 +328,10 @@ def _current_child_mode_session(child):
 @permission_classes([IsAuthenticated])
 def dashboard(request):
     child_id = request.query_params.get('child_id')
+    date_param = request.query_params.get('date')
+    start_date_param = request.query_params.get('start_date') or request.query_params.get('date_from')
+    end_date_param = request.query_params.get('end_date') or request.query_params.get('date_to')
+
     try:
         child = _get_child_for_parent(request.user, child_id)
     except ChildProfile.DoesNotExist:
@@ -295,12 +341,49 @@ def dashboard(request):
     today = timezone.localdate()
     now = timezone.now()
     sessions_qs = UsageSession.objects.filter(child=child).exclude(status=UsageSession.Status.BLOCKED).order_by('-started_at')
+    
     latest_logged_session = sessions_qs.first()
     report_date = timezone.localtime(latest_logged_session.started_at).date() if latest_logged_session else today
-    base_date = today if sessions_qs.filter(started_at__date=today).exists() else report_date
-    today_sessions = list(sessions_qs.filter(started_at__date=base_date))
-    weekly_sessions = list(sessions_qs.filter(started_at__date__gte=base_date - timedelta(days=6)))
-    recent_segments = list(sessions_qs[:14])
+
+    start_date = None
+    end_date = None
+    base_date = today
+
+    if start_date_param and end_date_param:
+        try:
+            start_date = datetime.strptime(start_date_param, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_param, '%Y-%m-%d').date()
+            if end_date < start_date:
+                return Response(
+                    {'detail': 'Ngày kết thúc không được sớm hơn ngày bắt đầu.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            base_date = end_date
+        except ValueError:
+            pass
+
+    if not start_date:
+        if date_param:
+            try:
+                base_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+            except ValueError:
+                base_date = today if sessions_qs.filter(started_at__date=today).exists() else report_date
+        else:
+            base_date = today if sessions_qs.filter(started_at__date=today).exists() else report_date
+
+    # Filter sessions
+    if start_date and end_date:
+        today_sessions = list(sessions_qs.filter(started_at__date__range=[start_date, end_date]))
+        weekly_sessions = today_sessions
+        recent_segments = list(sessions_qs.filter(started_at__date__range=[start_date, end_date]))
+        daily_series = _build_daily_series_for_range(weekly_sessions, start_date, end_date, now)
+    else:
+        today_sessions = list(sessions_qs.filter(started_at__date=base_date))
+        weekly_sessions = list(sessions_qs.filter(started_at__date__range=[base_date - timedelta(days=6), base_date]))
+        recent_segments = list(sessions_qs.filter(started_at__date=base_date))
+        if not recent_segments:
+            recent_segments = list(sessions_qs[:14])
+        daily_series = _build_daily_series(weekly_sessions, base_date, now)
 
     child_session = _current_child_mode_session(child)
     limit_state = current_limit_state(child_session, now) if child_session else {
@@ -378,7 +461,6 @@ def dashboard(request):
     active_vs_passive = ratio_pair(metrics['active_minutes'], metrics['passive_minutes'])
     screen_vs_offscreen = ratio_pair(metrics['screen_time_minutes'], metrics['offscreen_time_minutes'])
     weekly_active_vs_passive = ratio_pair(weekly_metrics['active_minutes'], weekly_metrics['passive_minutes'])
-    daily_series = _build_daily_series(weekly_sessions, base_date, now)
     alerts = _build_parent_alerts(child, metrics, limit_state)
 
     current_segment_title = child_session.current_activity_title if child_session else ''
@@ -428,9 +510,14 @@ def dashboard(request):
                 'age': child.age,
             },
             'report_date': str(base_date),
+            'start_date': str(start_date) if start_date else None,
+            'end_date': str(end_date) if end_date else None,
             'rules': {
                 'voice_enabled': child.rules.voice_enabled,
                 'camera_enabled': child.rules.camera_enabled,
+                'entertainment_paused': child.rules.entertainment_paused,
+                'bedtime_lock_start': child.rules.bedtime_lock_start.isoformat() if child.rules.bedtime_lock_start else None,
+                'bedtime_lock_end': child.rules.bedtime_lock_end.isoformat() if child.rules.bedtime_lock_end else None,
                 'session_duration_limit_minutes': child.rules.session_duration_limit_minutes,
                 'total_screen_time_limit_minutes': child.rules.total_screen_time_limit_minutes,
                 'continuous_screen_time_limit_minutes': child.rules.continuous_screen_time_limit_minutes,
@@ -491,6 +578,7 @@ def dashboard(request):
 @permission_classes([IsAuthenticated])
 def hourly_usage(request):
     child_id = request.query_params.get('child_id')
+    date_param = request.query_params.get('date')
     try:
         child = _get_child_for_parent(request.user, child_id)
     except ChildProfile.DoesNotExist:
@@ -500,10 +588,18 @@ def hourly_usage(request):
     today = timezone.localdate()
     now = timezone.now()
     sessions_qs = UsageSession.objects.filter(child=child, status__in=[UsageSession.Status.ACTIVE, UsageSession.Status.COMPLETED, UsageSession.Status.PAUSED, UsageSession.Status.ABANDONED]).order_by('-started_at')
-    report_session = sessions_qs.filter(started_at__date=today).first() or sessions_qs.first()
-    report_date = timezone.localtime(report_session.started_at).date() if report_session else today
+    
+    if date_param:
+        try:
+            report_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            report_date = today
+    else:
+        report_session = sessions_qs.filter(started_at__date=today).first() or sessions_qs.first()
+        report_date = timezone.localtime(report_session.started_at).date() if report_session else today
+
     sessions = list(sessions_qs.filter(started_at__date=report_date))
-    hours = _build_hourly_breakdown(sessions, now)
+    hours = _build_hourly_breakdown(sessions, report_date, now)
     return Response({'child_id': str(child.id), 'date': str(report_date), 'hours': hours})
 
 

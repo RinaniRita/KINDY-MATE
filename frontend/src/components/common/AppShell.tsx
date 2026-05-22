@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { PersistentMascot } from "@/components/child/PersistentMascot";
-import { apiPatch, apiPost, apiPostWithStatus, type AuthResponse } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, apiPostWithStatus, type AuthResponse } from "@/lib/api";
 import {
   clearChildModeSession,
   isChildModePrompted,
@@ -28,6 +28,10 @@ type AppShellProps = {
 };
 
 type PinMode = "verify" | "setup";
+type BedtimeWindow = {
+  start: string | null;
+  end: string | null;
+};
 
 function childRouteLabel(pathname: string | null | undefined) {
   if (!pathname) return "Khu đang mở";
@@ -54,6 +58,50 @@ function breakRemainingMinutes(limitState: LimitState | null) {
   return Math.max(Math.ceil((end - Date.now()) / 60_000), 0);
 }
 
+function parseClock(raw: string | null) {
+  if (!raw) return null;
+  const [hourText = "0", minuteText = "0", secondText = "0"] = raw.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if ([hour, minute, second].some((value) => Number.isNaN(value))) return null;
+  return { hour, minute, second };
+}
+
+function isBedtimeLockedAt(startRaw: string | null, endRaw: string | null, now: Date) {
+  const start = parseClock(startRaw);
+  const end = parseClock(endRaw);
+  if (!start || !end) return false;
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = start.hour * 60 + start.minute;
+  const endMinutes = end.hour * 60 + end.minute;
+
+  if (startMinutes < endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+  }
+  return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+}
+
+function secondsUntilNextBedtimeStart(startRaw: string | null, endRaw: string | null, now: Date) {
+  const start = parseClock(startRaw);
+  if (!start || isBedtimeLockedAt(startRaw, endRaw, now)) return null;
+
+  const next = new Date(now);
+  next.setHours(start.hour, start.minute, start.second, 0);
+  if (next.getTime() <= now.getTime()) {
+    next.setDate(next.getDate() + 1);
+  }
+
+  return Math.max(Math.floor((next.getTime() - now.getTime()) / 1000), 0);
+}
+
+function formatCountdown(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function AppShell({ children, nav, subtitle, title, tone = "public", childId }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -74,6 +122,8 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   const [showChildEndModal, setShowChildEndModal] = useState(false);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [limitState, setLimitState] = useState<LimitState | null>(null);
+  const [bedtimeWindow, setBedtimeWindow] = useState<BedtimeWindow | null>(null);
+  const [clockTick, setClockTick] = useState(() => Date.now());
 
   useEffect(() => {
     if (tone === "child" && !hasParentPin()) {
@@ -88,6 +138,12 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   const childHomeHref = childId ? `/child/${childId}/home` : "/child/select-profile";
   const currentSegmentDescriptor = useMemo(() => segmentDescriptorForPath(pathname), [pathname]);
   const remainingBreakMinutes = breakRemainingMinutes(limitState);
+  const bedtimeCountdownSeconds = useMemo(() => {
+    if (!bedtimeWindow) return null;
+    return secondsUntilNextBedtimeStart(bedtimeWindow.start, bedtimeWindow.end, new Date(clockTick));
+  }, [bedtimeWindow, clockTick]);
+  const shouldShowBedtimeTimer =
+    typeof bedtimeCountdownSeconds === "number" && bedtimeCountdownSeconds > 0 && bedtimeCountdownSeconds <= 5 * 60;
 
   useEffect(() => {
     if (tone !== "child" || typeof window === "undefined") return;
@@ -106,6 +162,36 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
       window.setTimeout(() => setShowStartSessionModal(true), 0);
     }
   }, [childId, pathname, tone]);
+
+  useEffect(() => {
+    if (!isChildTone || !childId) return;
+    let cancelled = false;
+
+    async function loadBedtimeWindow() {
+      const payload = await apiGet<{
+        rules?: {
+          bedtime_lock_start?: string | null;
+          bedtime_lock_end?: string | null;
+        };
+      }>(`/activity/dashboard/?child_id=${childId}`, {});
+      if (cancelled || !payload.rules) return;
+      setBedtimeWindow({
+        start: payload.rules.bedtime_lock_start ?? null,
+        end: payload.rules.bedtime_lock_end ?? null,
+      });
+    }
+
+    void loadBedtimeWindow();
+    return () => {
+      cancelled = true;
+    };
+  }, [childId, isChildTone]);
+
+  useEffect(() => {
+    if (!isChildTone || !bedtimeWindow?.start) return;
+    const timer = setInterval(() => setClockTick(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [bedtimeWindow?.start, isChildTone]);
 
   useEffect(() => {
     if (!isChildTone || !childId) return;
@@ -472,7 +558,8 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
 
       {isChildTone ? (
         <div className="pointer-events-none fixed left-4 right-4 top-4 z-30 flex items-start justify-between gap-3">
-          <div className="pointer-events-auto flex gap-2">
+          <div className="pointer-events-auto flex flex-col gap-2">
+            <div className="flex gap-2">
             {!isChildHome ? (
               <>
                 <Link href={childHomeHref} className="child-mini-badge">
@@ -483,6 +570,13 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
                   <span>{childRouteLabel(pathname)}</span>
                 </div>
               </>
+            ) : null}
+            </div>
+            {shouldShowBedtimeTimer ? (
+              <div className="child-mini-badge border-amber-200 bg-amber-50/95 text-amber-900 shadow-md">
+                <span>ðŸŒ™</span>
+                <span>Còn {formatCountdown(bedtimeCountdownSeconds ?? 0)} trước giờ nghỉ</span>
+              </div>
             ) : null}
           </div>
           <button
