@@ -1,217 +1,321 @@
 import json
+import os
 import random
 import urllib.request
-import urllib.error
-from django.http import StreamingHttpResponse
+
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
 
 from apps.profiles.models import ChildProfile
+
 from .ai_prompts import get_milo_system_prompt
 
-OLLAMA_MODEL = "gemma4:E2B"
 
-OLLAMA_URLS = [
-    "http://host.docker.internal:11434/api/chat",
-    "http://localhost:11434/api/chat",
-]
-
-
-def _resolve_ollama_urls():
-    import os
+def _build_ollama_urls():
     env_url = os.getenv("OLLAMA_API_URL")
     urls = []
     if env_url:
         urls.append(env_url)
-    urls.extend(OLLAMA_URLS)
+    urls.extend(
+        [
+            "http://host.docker.internal:11434/api/chat",
+            "http://localhost:11434/api/chat",
+        ]
+    )
     return urls
 
 
-def _build_messages(system_prompt: str, chat_history: list, message: str) -> list:
-    messages = [{"role": "system", "content": system_prompt}]
-    for hist in chat_history[-6:]:
-        messages.append({
-            "role": "user" if hist.get("role") == "user" else "assistant",
-            "content": hist.get("content", ""),
-        })
-    messages.append({"role": "user", "content": message})
-    return messages
+def _post_to_ollama(model: str, messages: list[dict], *, temperature: float, num_predict: int, timeout: int):
+    last_err = None
+    for url in _build_ollama_urls():
+        try:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": num_predict,
+                },
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8")), None
+        except Exception as exc:  # noqa: BLE001
+            last_err = str(exc)
+            continue
+    return None, last_err
 
 
-def _fallback_reply(nickname: str) -> str:
-    options = [
-        f"Ôi, Milo đang hơi buồn ngủ một tí rồi {nickname} ơi! Cậu đi học bài rồi quay lại trò chuyện với tớ nhé! 🐱🌟",
-        f"Tớ rất vui được trò chuyện với cậu! Nhưng hình như tớ đang bận một tí, hẹn bé {nickname} một lát nữa nha! ❤️",
-        f"Bé {nickname} ơi, cậu hôm nay thật tuyệt vời! Milo chúc cậu một ngày học tập thật nhiều niềm vui nhé! 🎉⭐",
-    ]
-    return random.choice(options)
+def _fallback_parent_insight(message: str, child: ChildProfile, context: dict) -> tuple[str, str]:
+    metrics = context.get("metrics") or {}
+    weekly_metrics = context.get("weekly_metrics") or {}
+    latest_activity = context.get("latest_activity") or {}
+    alerts = context.get("alerts") or []
+    weekly_summary = context.get("weekly_summary") or ""
+    report_date = context.get("report_date") or ""
+    highlights = context.get("eda_highlights") or []
+
+    normalized = (message or "").lower()
+
+    if any(
+        keyword in normalized
+        for keyword in ["nghiện", "tâm lý", "trầm cảm", "adhd", "bệnh", "rối loạn", "thiếu tập trung", "chẩn đoán"]
+    ):
+        return (
+            "Tôi không thể chẩn đoán hay gắn nhãn tâm lý hoặc y tế cho trẻ. Tôi chỉ có thể tóm tắt dữ liệu hoạt động hiện có trong app.",
+            "/parent/reports",
+        )
+
+    if not weekly_metrics.get("total_app_minutes") and not metrics.get("total_app_minutes"):
+        return (
+            "Hiện chưa có đủ dữ liệu trong tuần này để kết luận xu hướng. Bạn có thể xem lại sau khi bé dùng app thêm vài phiên.",
+            "/parent/reports",
+        )
+
+    if any(token in normalized for token in ["bao lâu", "bao nhiêu", "thời gian"]):
+        return (
+            f"Dựa trên dữ liệu ngày {report_date}, {child.nickname} đã dùng app {metrics.get('total_app_minutes', 0)} phút, trong đó {metrics.get('screen_time_minutes', 0)} phút trên màn hình và {metrics.get('offscreen_time_minutes', 0)} phút ngoài màn hình.",
+            "/parent/dashboard",
+        )
+
+    if any(token in normalized for token in ["phiên gần nhất", "vừa rồi", "vừa dùng"]):
+        if latest_activity:
+            title = latest_activity.get("content_title") or latest_activity.get("notes") or "một hoạt động trong app"
+            return (
+                f'Phiên gần nhất tôi ghi nhận là "{title}", kéo dài {latest_activity.get("duration_minutes", 0)} phút.',
+                "/parent/dashboard",
+            )
+        return (f"Hiện tôi chưa có phiên hoàn chỉnh nào gần đây của {child.nickname}.", "/parent/dashboard")
+
+    if any(token in normalized for token in ["chủ động", "thụ động"]):
+        summary = highlights[0] if highlights else weekly_summary
+        return (
+            f"Trong 7 ngày gần đây, {child.nickname} có {weekly_metrics.get('active_minutes', 0)} phút hoạt động chủ động và {weekly_metrics.get('passive_minutes', 0)} phút nội dung thụ động. {summary}",
+            "/parent/reports",
+        )
+
+    if any(token in normalized for token in ["an toàn", "chú ý", "cảnh báo"]):
+        if alerts:
+            return (f"Hiện có {len(alerts)} ghi chú dành cho phụ huynh. Mục nổi bật nhất là: {alerts[0]}", "/parent/dashboard")
+        return ("Hiện chưa có ghi chú an toàn mới trong dashboard.", "/parent/dashboard")
+
+    return (
+        weekly_summary
+        or f"Tôi có thể tóm tắt thời gian dùng app, phiên gần nhất, xu hướng 7 ngày và các ghi chú dành cho phụ huynh của {child.nickname}.",
+        "/parent/reports",
+    )
+
+
+def _compact_parent_context(raw_context: dict) -> dict:
+    if not isinstance(raw_context, dict):
+        return {}
+
+    recent_sessions = raw_context.get("recent_sessions") or []
+    compact_sessions = []
+    for session in recent_sessions[:4]:
+        compact_sessions.append(
+            {
+                "activity_category": session.get("activity_category"),
+                "display_category": session.get("display_category"),
+                "content_title": session.get("content_title"),
+                "notes": session.get("notes"),
+                "duration_minutes": session.get("duration_minutes"),
+                "started_at": session.get("started_at"),
+            }
+        )
+
+    return {
+        "report_date": raw_context.get("report_date"),
+        "metrics": raw_context.get("metrics") or {},
+        "weekly_metrics": raw_context.get("weekly_metrics") or {},
+        "alerts": (raw_context.get("alerts") or [])[:5],
+        "weekly_summary": raw_context.get("weekly_summary") or "",
+        "eda_highlights": (raw_context.get("eda_highlights") or [])[:4],
+        "latest_activity": raw_context.get("latest_activity") or {},
+        "recent_sessions": compact_sessions,
+    }
 
 
 class MiloChatView(APIView):
-    """Non-streaming chat endpoint (kept for backwards compatibility)."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         child_id = request.data.get("child_id")
         message = request.data.get("message")
         chat_history = request.data.get("history", [])
-        screen_context = request.data.get("screen_context", "")
 
         if not child_id or not message:
-            return Response(
-                {"detail": "child_id và message là bắt buộc."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"detail": "child_id và message là bắt buộc."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            child = ChildProfile.objects.select_related("wallet").get(
-                id=child_id, parent=request.user
-            )
+            child = ChildProfile.objects.select_related("wallet").get(id=child_id, parent=request.user)
         except ChildProfile.DoesNotExist:
-            return Response(
-                {"detail": "Không tìm thấy hồ sơ trẻ."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"detail": "Không tìm thấy hồ sơ trẻ."}, status=status.HTTP_404_NOT_FOUND)
 
         nickname = child.nickname
+        age = child.age
+        points = child.wallet.points_balance if hasattr(child, "wallet") else child.wallet_balance
+        interests = child.interests or "chưa rõ"
+        subjects = child.favorite_subjects or "chưa rõ"
+
         system_prompt = get_milo_system_prompt(
             nickname=nickname,
-            age=child.age,
-            points=child.wallet.points_balance if hasattr(child, "wallet") else child.wallet_balance,
-            interests=child.interests or "chưa rõ",
-            subjects=child.favorite_subjects or "chưa rõ",
-            screen_context=screen_context,
+            age=age,
+            points=points,
+            interests=interests,
+            subjects=subjects,
         )
-        messages = _build_messages(system_prompt, chat_history, message)
 
-        ollama_response = None
-        last_err = None
-
-        for url in _resolve_ollama_urls():
-            try:
-                payload = {
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {"temperature": 0.7, "num_predict": 150},
+        messages = [{"role": "system", "content": system_prompt}]
+        for hist in chat_history[-6:]:
+            messages.append(
+                {
+                    "role": "user" if hist.get("role") == "user" else "assistant",
+                    "content": hist.get("content", ""),
                 }
-                data = json.dumps(payload).encode("utf-8")
-                req = urllib.request.Request(
-                    url, data=data,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    ollama_response = json.loads(resp.read().decode("utf-8"))
-                    break
-            except Exception as e:
-                last_err = str(e)
-                continue
+            )
+        messages.append({"role": "user", "content": message})
+
+        ollama_response, last_err = _post_to_ollama(
+            "qwen2.5:7b",
+            messages,
+            temperature=0.7,
+            num_predict=160,
+            timeout=20,
+        )
 
         if not ollama_response:
-            return Response({
-                "reply": _fallback_reply(nickname),
-                "status": "fallback_offline",
-                "detail": f"Ollama offline: {last_err}",
-            })
+            fallback_replies = [
+                f"Ôi, Milo đang hơi buồn ngủ một tí rồi {nickname} ơi. Cậu đi học bài hoặc tập thể dục một tí rồi quay lại trò chuyện với tớ nhé.",
+                f"Tớ rất vui được trò chuyện với cậu. Nhưng hình như tớ đang bận đi dọn phòng rồi, hẹn bé {nickname} một lát nữa nhé.",
+                f"Bé {nickname} ơi, cậu hôm nay thật tuyệt vời. Milo chúc cậu một ngày học tập thật nhiều niềm vui nhé.",
+            ]
+            return Response(
+                {
+                    "reply": random.choice(fallback_replies),
+                    "status": "fallback_offline",
+                    "detail": f"Ollama offline: {last_err}",
+                }
+            )
 
         reply = ollama_response.get("message", {}).get("content", "").strip()
         return Response({"reply": reply, "status": "success"})
 
 
-class MiloChatStreamView(APIView):
-    """
-    Streaming chat endpoint using Server-Sent Events (SSE).
-    Sends text chunks for real-time typing.
-    When a sentence completes, sends an audio chunk: data: {"chunk": "", "audio": "base64...", "done": false}
-    """
+class ParentInsightsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         child_id = request.data.get("child_id")
-        message = request.data.get("message")
+        message = (request.data.get("message") or "").strip()
         chat_history = request.data.get("history", [])
-        screen_context = request.data.get("screen_context", "")
+        context = _compact_parent_context(request.data.get("context") or {})
 
         if not child_id or not message:
-            def _err():
-                yield f"data: {json.dumps({'chunk': 'Thiếu thông tin rồi bé ơi!', 'done': True})}\n\n"
-            return StreamingHttpResponse(_err(), content_type="text/event-stream")
+            return Response({"detail": "child_id và message là bắt buộc."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            child = ChildProfile.objects.select_related("wallet").get(
-                id=child_id, parent=request.user
-            )
+            child = ChildProfile.objects.get(id=child_id, parent=request.user)
         except ChildProfile.DoesNotExist:
-            def _err():
-                yield f"data: {json.dumps({'chunk': 'Không tìm thấy hồ sơ trẻ.', 'done': True})}\n\n"
-            return StreamingHttpResponse(_err(), content_type="text/event-stream")
+            return Response({"detail": "Không tìm thấy hồ sơ trẻ."}, status=status.HTTP_404_NOT_FOUND)
 
-        nickname = child.nickname
-        system_prompt = get_milo_system_prompt(
-            nickname=nickname,
-            age=child.age,
-            points=child.wallet.points_balance if hasattr(child, "wallet") else child.wallet_balance,
-            interests=child.interests or "chưa rõ",
-            subjects=child.favorite_subjects or "chưa rõ",
-            screen_context=screen_context,
+        system_prompt = """
+Bạn là Trợ lý phụ huynh của Kindy-Mate.
+
+Nhiệm vụ duy nhất:
+- Tóm tắt và giải thích dữ liệu hoạt động của trẻ trong Kindy-Mate cho phụ huynh.
+
+Phạm vi được phép dùng:
+- dashboard
+- báo cáo
+- recent sessions
+- alerts
+
+Ràng buộc bắt buộc:
+- Chỉ trả lời dựa trên dữ liệu được cung cấp trong request.
+- Không bịa thêm số liệu, không đoán ngoài dữ liệu.
+- Không chẩn đoán y tế, tâm lý, hành vi bệnh lý và không dùng từ "nghiện".
+- Nếu dữ liệu chưa đủ, phải nói rõ là chưa đủ dữ liệu.
+- Trả lời bằng tiếng Việt, ngắn, rõ, thực dụng.
+- Không viết suy nghĩ nội bộ, không giải thích chuỗi lập luận.
+- Nếu phù hợp, mở đầu bằng "Dựa trên dữ liệu ngày..." hoặc "Trong 7 ngày gần đây...".
+- Không nói về kiến thức ngoài dự án, không tư vấn chung chung ngoài dữ liệu hiện có.
+- Không nhắc tới chat history của trẻ; hệ thống này không dùng free-chat của trẻ cho phân tích phụ huynh.
+""".strip()
+
+        context_text = json.dumps(
+            {
+                "child": {
+                    "nickname": child.nickname,
+                    "age": child.age,
+                },
+                "context": context,
+            },
+            ensure_ascii=False,
         )
-        messages = _build_messages(system_prompt, chat_history, message)
 
-        def generate():
-            streamed = False
-            for url in _resolve_ollama_urls():
-                try:
-                    payload = {
-                        "model": OLLAMA_MODEL,
-                        "messages": messages,
-                        "stream": True,
-                        "options": {"temperature": 0.7, "num_predict": 150},
-                    }
-                    data = json.dumps(payload).encode("utf-8")
-                    req = urllib.request.Request(
-                        url, data=data,
-                        headers={"Content-Type": "application/json"},
-                        method="POST",
-                    )
-                    with urllib.request.urlopen(req, timeout=30) as resp:
-                        for raw_line in resp:
-                            line = raw_line.decode("utf-8").strip()
-                            if not line:
-                                continue
-                            try:
-                                chunk_data = json.loads(line)
-                            except json.JSONDecodeError:
-                                continue
-                            
-                            content = chunk_data.get("message", {}).get("content", "")
-                            done = chunk_data.get("done", False)
-                            
-                            if content:
-                                streamed = True
-                                # Yield text chunk immediately for UI typing effect
-                                yield f"data: {json.dumps({'chunk': content, 'done': False})}\n\n"
-                            
-                            if done:
-                                yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
-                                return
-                    return  # successfully finished with this url
-                except Exception as e:
-                    print(f"Ollama stream error: {e}")
-                    continue
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.append({"role": "system", "content": f"Dữ liệu được phép dùng:\n{context_text}"})
+        for hist in chat_history[-6:]:
+            messages.append(
+                {
+                    "role": "user" if hist.get("role") == "user" else "assistant",
+                    "content": hist.get("content", ""),
+                }
+            )
+        messages.append({"role": "user", "content": message})
 
-            # Ollama offline fallback
-            if not streamed:
-                fallback = _fallback_reply(nickname)
-                yield f"data: {json.dumps({'chunk': fallback, 'done': False})}\n\n"
-                yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
-
-        streaming_response = StreamingHttpResponse(
-            generate(), content_type="text/event-stream"
+        ollama_response, last_err = _post_to_ollama(
+            "qwen2.5:7b",
+            messages,
+            temperature=0.15,
+            num_predict=180,
+            timeout=18,
         )
-        streaming_response["Cache-Control"] = "no-cache"
-        streaming_response["X-Accel-Buffering"] = "no"
-        streaming_response["Access-Control-Allow-Origin"] = "*"
-        return streaming_response
+
+        if not ollama_response:
+            reply, link_target = _fallback_parent_insight(message, child, context)
+            return Response(
+                {
+                    "reply": reply,
+                    "status": "fallback",
+                    "source_scope": "dashboard_reports_only",
+                    "link_target": link_target,
+                    "detail": f"Ollama offline: {last_err}",
+                }
+            )
+
+        reply = ollama_response.get("message", {}).get("content", "").strip()
+        if not reply:
+            reply, link_target = _fallback_parent_insight(message, child, context)
+            return Response(
+                {
+                    "reply": reply,
+                    "status": "fallback",
+                    "source_scope": "dashboard_reports_only",
+                    "link_target": link_target,
+                    "detail": "Ollama returned an empty response.",
+                }
+            )
+
+        link_target = (
+            "/parent/reports"
+            if any(token in message.lower() for token in ["tuần", "xu hướng", "chủ động", "thụ động"])
+            else "/parent/dashboard"
+        )
+        return Response(
+            {
+                "reply": reply,
+                "status": "success",
+                "source_scope": "dashboard_reports_only",
+                "link_target": link_target,
+            }
+        )

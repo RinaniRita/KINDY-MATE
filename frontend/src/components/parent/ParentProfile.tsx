@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -96,6 +97,19 @@ export function ParentProfile() {
 
         <div className="mt-5 rounded-[1.75rem] border border-amber-100 bg-amber-50/70 p-5 text-sm font-semibold leading-6 text-slate-600">
           Trẻ không có tài khoản riêng trong giai đoạn này. Hồ sơ trẻ, luật sử dụng và báo cáo đều thuộc phiên đăng nhập của phụ huynh.
+        </div>
+
+        <div className="mt-5 rounded-[1.75rem] border border-sky-100 bg-sky-50/70 p-5">
+          <p className="text-sm font-black text-slate-800">FAQs về các giới hạn thời gian</p>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            Nếu phụ huynh muốn hiểu rõ từng giới hạn có nghĩa là gì, hãy mở phần giải thích ngắn gọn này.
+          </p>
+          <Link
+            href="/parent/profile/faqs"
+            className="mt-4 inline-flex min-h-11 items-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-black text-sky-700 shadow-sm"
+          >
+            Mở FAQs
+          </Link>
         </div>
 
         <button

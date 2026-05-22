@@ -13,7 +13,19 @@ class ContentItemViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ContentItemSerializer
 
     def get_queryset(self):
-        return ContentItem.objects.filter(approval_status=ContentItem.ApprovalStatus.APPROVED)
+        child_id = self.request.query_params.get('child_id')
+        queryset = ContentItem.objects.filter(approval_status=ContentItem.ApprovalStatus.APPROVED)
+        if child_id:
+            try:
+                child = ChildProfile.objects.get(id=child_id, parent=self.request.user)
+            except ChildProfile.DoesNotExist:
+                return ContentItem.objects.none()
+            queryset = queryset.filter(
+                age_min__lte=child.age,
+                age_max__gte=child.age,
+                content_type__in=child.rules.allowed_categories,
+            )
+        return queryset
 
 
 class MissionViewSet(viewsets.ReadOnlyModelViewSet):
@@ -27,7 +39,11 @@ class MissionViewSet(viewsets.ReadOnlyModelViewSet):
                 child = ChildProfile.objects.get(id=child_id, parent=self.request.user)
             except ChildProfile.DoesNotExist:
                 return Mission.objects.none()
-            queryset = queryset.filter(age_min__lte=child.age, age_max__gte=child.age)
+            queryset = queryset.filter(
+                age_min__lte=child.age,
+                age_max__gte=child.age,
+                mission_type__in=child.rules.allowed_categories,
+            )
         return queryset
 
     @action(detail=True, methods=['post'])

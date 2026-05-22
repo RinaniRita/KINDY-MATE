@@ -139,6 +139,7 @@ class ChildProfileSerializer(serializers.ModelSerializer):
                 'reading',
                 'movement',
                 'creative',
+                'reflection',
                 'mascot_item',
             ],
             **default_limits,

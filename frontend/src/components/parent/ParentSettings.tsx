@@ -24,8 +24,14 @@ function PinSection() {
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const session = readAuthSession();
-  const hasPinConfigured = session?.user?.pin_configured;
+  const hasPinConfigured = mounted ? session?.user?.pin_configured : false;
 
   async function handleChangePin() {
     setStatus("");
@@ -314,7 +320,31 @@ function AuditLog() {
 export function ParentSettings() {
   return (
     <div className="grid gap-6 py-4">
-      <PinSection />
+      <section id="general" className="scroll-mt-28">
+        <Panel eyebrow="Cài đặt chung" title="Nguyên tắc tài khoản phụ huynh">
+          <div className="grid gap-3 text-sm font-semibold leading-7 text-slate-600">
+            <p>Tài khoản phụ huynh là nơi duy nhất được phép đổi luật, vào dashboard, kết thúc khu trẻ em và xuất/xóa dữ liệu.</p>
+            <p>Những thay đổi quan trọng nên được thực hiện từ đây thay vì trong khu trẻ em để tránh lộ controls cho trẻ.</p>
+          </div>
+        </Panel>
+      </section>
+      <section id="security" className="scroll-mt-28">
+        <PinSection />
+      </section>
+      <section id="language" className="scroll-mt-28">
+        <Panel eyebrow="Ngôn ngữ" title="Ngôn ngữ hiển thị">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold leading-7 text-slate-600">
+            MVP hiện đang tối ưu cho tiếng Việt. Nếu cần thêm ngôn ngữ khác, đây sẽ là nơi đặt lựa chọn ngôn ngữ giao diện trong phase tiếp theo.
+          </div>
+        </Panel>
+      </section>
+      <section id="privacy" className="scroll-mt-28">
+        <Panel eyebrow="An toàn & quyền riêng tư" title="Bảo vệ dữ liệu trẻ em">
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-sm font-semibold leading-7 text-slate-700">
+            Kindy-Mate không dùng free-chat cho trẻ, không suy luận chẩn đoán tâm lý/y tế và không cần dữ liệu nhận diện cá nhân của trẻ để vận hành MVP hiện tại.
+          </div>
+        </Panel>
+      </section>
       <DataManagement />
       <AuditLog />
     </div>

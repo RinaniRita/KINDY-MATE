@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import MiloChatView, MiloChatStreamView
+
+from .views import MiloChatView, ParentInsightsView
 
 urlpatterns = [
-    path("milo/chat/",        MiloChatView.as_view(),       name="milo-chat"),
-    path("milo/chat/stream/", MiloChatStreamView.as_view(), name="milo-chat-stream"),
+    path('milo/chat/', MiloChatView.as_view(), name='milo-chat'),
+    path('parent-insights/', ParentInsightsView.as_view(), name='parent-insights'),
 ]

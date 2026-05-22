@@ -42,9 +42,15 @@ export function Metric({
   };
 
   return (
-    <div className={`rounded-[1.5rem] border bg-gradient-to-br ${gradientStyles[variant]} p-5 shadow-sm transition-all duration-300 hover:shadow-md`}>
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-1.5 text-2xl font-black tracking-tight text-slate-800">{value}</p>
+    <div
+      className={`flex min-h-[112px] flex-col rounded-[1.5rem] border bg-gradient-to-br ${gradientStyles[variant]} p-4 shadow-sm transition-all duration-300 hover:shadow-md`}
+    >
+      <p className="min-h-[2.35rem] text-[10px] font-black uppercase leading-5 tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-auto whitespace-nowrap text-[clamp(1.5rem,3vw,2rem)] font-black leading-none tracking-tight text-slate-800">
+        {value}
+      </p>
     </div>
   );
 }
