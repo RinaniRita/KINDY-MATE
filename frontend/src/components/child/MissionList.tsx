@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { apiGetRequired } from "@/lib/api";
 import { YouTubeEmbed } from "@/components/common/YouTubeEmbed";
+import { InteractiveVideoQuiz } from "@/components/common/InteractiveVideoQuiz";
 
 import { missionCategoryMeta, missionCategoryOrder } from "./categoryMaps";
 import type { MissionData } from "./types";
@@ -226,7 +227,22 @@ export function MissionList({
 
             {resolvedGroup.key === "su_that_thu_vi" && activeVideoId && (
               <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <YouTubeEmbed urlOrId={activeVideoId} />
+                {activeVideoId === "LKVGeuPgW68" ? (
+                  <InteractiveVideoQuiz
+                    videoId={activeVideoId}
+                    triggerTimeSec={115} // Pause at 1m 55s
+                    question="Hành tinh nào gần Mặt Trời nhất và có một năm chỉ dài khoảng 88 ngày?"
+                    options={[
+                      { id: "A", label: "Sao Kim (Venus)" },
+                      { id: "B", label: "Trái Đất (Earth)" },
+                      { id: "C", label: "Sao Thủy (Mercury)" },
+                      { id: "D", label: "Sao Hỏa (Mars)" },
+                    ]}
+                    correctOptionId="C"
+                  />
+                ) : (
+                  <YouTubeEmbed urlOrId={activeVideoId} />
+                )}
               </div>
             )}
 
