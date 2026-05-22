@@ -9,7 +9,7 @@ export default async function StudyPage({ params }: { params: Params }) {
     <ChildLayout childId={childId}>
       <MissionList
         childId={childId}
-        allowedCategories={["hoc_hanh", "doc_sach", "ky_nang_song"]}
+        allowedCategories={["hoc_hanh", "doc_sach", "ky_nang_song", "su_that_thu_vi"]}
         zoneLabel="Bàn học"
         zoneTitle="Bàn học đang mở những việc nhỏ cho cậu."
         zoneDescription="Ở đây có quiz, đọc ngắn và những việc thực hành vừa sức."

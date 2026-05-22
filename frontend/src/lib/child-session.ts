@@ -191,3 +191,28 @@ export function segmentDescriptorForPath(pathname: string | null | undefined): S
     session_type: "screen_time",
   };
 }
+
+export function parseClock(raw: string | null) {
+  if (!raw) return null;
+  const [hourText = "0", minuteText = "0", secondText = "0"] = raw.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if ([hour, minute, second].some((value) => Number.isNaN(value))) return null;
+  return { hour, minute, second };
+}
+
+export function isBedtimeLockedAt(startRaw: string | null, endRaw: string | null, now: Date) {
+  const start = parseClock(startRaw);
+  const end = parseClock(endRaw);
+  if (!start || !end) return false;
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = start.hour * 60 + start.minute;
+  const endMinutes = end.hour * 60 + end.minute;
+
+  if (startMinutes < endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+  }
+  return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+}

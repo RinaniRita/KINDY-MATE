@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { apiGetRequired } from "@/lib/api";
+import { YouTubeEmbed } from "@/components/common/YouTubeEmbed";
 
 import { missionCategoryMeta, missionCategoryOrder } from "./categoryMaps";
 import type { MissionData } from "./types";
@@ -16,14 +17,58 @@ type MissionListProps = {
   zoneDescription?: string;
 };
 
-function groupByCategory(missions: MissionData[]) {
-  return missionCategoryOrder
-    .map((categoryKey) => ({
-      key: categoryKey,
-      meta: missionCategoryMeta[categoryKey],
-      items: missions.filter((mission) => mission.display_category === categoryKey),
-    }))
-    .filter((group) => group.items.length > 0);
+function groupByCategory(missions: MissionData[], allowedCategories?: string[]) {
+  const hasSuThatThuVi = allowedCategories?.includes("su_that_thu_vi");
+  const categories = [...missionCategoryOrder];
+
+  return categories
+    .map((categoryKey) => {
+      if (categoryKey === "su_that_thu_vi") {
+        return {
+          key: "su_that_thu_vi",
+          meta: missionCategoryMeta[categoryKey],
+          items: [
+            {
+              id: "LKVGeuPgW68",
+              mission_type: "video_learning",
+              mission_type_label: "Xem video khám phá",
+              display_category: "su_that_thu_vi",
+              display_category_label: "Những Sự Thật Thú Vị",
+              title: "Những Sự Thật Thú Vị Về Hệ Mặt Trời",
+              description: "Khám phá vũ trụ bao la và các hành tinh kỳ diệu trong Hệ Mặt Trời cùng Milo nhé!",
+              points_reward: 5,
+              estimated_duration_minutes: 5,
+              requires_voice: false,
+              requires_camera: false,
+              verification_method: "auto",
+              safety_notes: "",
+            },
+            {
+              id: "CCHmz1JuGWQ",
+              mission_type: "video_learning",
+              mission_type_label: "Xem video khám phá",
+              display_category: "su_that_thu_vi",
+              display_category_label: "Những Sự Thật Thú Vị",
+              title: "Tất Cả Mọi Thứ về các VÙNG NƯỚC trên Trái Đất",
+              description: "Cùng phiêu lưu khám phá những bí ẩn kỳ thú của đại dương, hồ và sông ngòi trên hành tinh xanh.",
+              points_reward: 5,
+              estimated_duration_minutes: 6,
+              requires_voice: false,
+              requires_camera: false,
+              verification_method: "auto",
+              safety_notes: "",
+            }
+          ] as unknown as MissionData[],
+        };
+      }
+
+      return {
+        key: categoryKey,
+        meta: missionCategoryMeta[categoryKey],
+        items: missions.filter((mission) => mission.display_category === categoryKey),
+      };
+    })
+    .filter((group) => group.items && group.items.length > 0);
 }
 
 function missionDecor(categoryKey: string) {
@@ -51,6 +96,7 @@ export function MissionList({
   const [missions, setMissions] = useState<MissionData[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -69,9 +115,17 @@ export function MissionList({
     return missions.filter((mission) => allowedCategories.includes(mission.display_category));
   }, [allowedCategories, missions]);
 
-  const grouped = useMemo(() => groupByCategory(filteredMissions), [filteredMissions]);
+  const grouped = useMemo(() => groupByCategory(filteredMissions, allowedCategories), [filteredMissions, allowedCategories]);
   const resolvedCategory = grouped.some((group) => group.key === selectedCategory) ? selectedCategory : grouped[0]?.key || "";
   const resolvedGroup = grouped.find((group) => group.key === resolvedCategory);
+
+  // Set default video for Những Sự Thật Thú Vị category
+  useEffect(() => {
+    if (resolvedCategory === "su_that_thu_vi" && !activeVideoId) {
+      setActiveVideoId("LKVGeuPgW68");
+    }
+  }, [resolvedCategory, activeVideoId]);
+
   const showSelector = grouped.length > 1;
   const emoji = zoneEmoji(zoneLabel);
 
@@ -170,51 +224,114 @@ export function MissionList({
               <div className="child-mini-badge bg-white/86">{missionDecor(resolvedGroup.key)}</div>
             </div>
 
+            {resolvedGroup.key === "su_that_thu_vi" && activeVideoId && (
+              <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <YouTubeEmbed urlOrId={activeVideoId} />
+              </div>
+            )}
+
             <div className="mt-6 grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-              {resolvedGroup.items.map((mission, index) => (
-                <Link
-                  key={mission.id}
-                  href={`/child/${childId}/missions/${mission.id}`}
-                  className={`group relative overflow-hidden rounded-[2.2rem] border border-white/82 bg-gradient-to-br ${resolvedGroup.meta.tone} px-5 py-5 shadow-[0_18px_36px_rgba(145,163,179,0.14)] transition hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(145,163,179,0.22)]`}
-                >
-                  <div className="absolute inset-x-0 top-0 h-16 bg-white/28" />
-                  <div className="absolute -right-3 bottom-0 text-7xl opacity-[0.12] transition group-hover:scale-110">{resolvedGroup.meta.icon}</div>
-
-                  <div className="relative z-10">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="rounded-[1.2rem] border border-white/80 bg-white/76 px-3 py-2 text-xs font-black text-slate-500 shadow-sm">
-                        Chặng {index + 1}
+              {resolvedGroup.items.map((mission, index) => {
+                if (resolvedGroup.key === "su_that_thu_vi") {
+                  const isActive = activeVideoId === mission.id;
+                  return (
+                    <button
+                      key={mission.id}
+                      type="button"
+                      onClick={() => setActiveVideoId(mission.id)}
+                      className={`group relative overflow-hidden rounded-[2.2rem] border text-left bg-gradient-to-br ${resolvedGroup.meta.tone} px-5 py-5 shadow-[0_18px_36px_rgba(145,163,179,0.14)] transition hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(145,163,179,0.22)] ${
+                        isActive ? "ring-4 ring-blue-400 ring-offset-2" : "border-white/82"
+                      }`}
+                    >
+                      <div className="absolute inset-x-0 top-0 h-16 bg-white/28" />
+                      <div className="absolute -right-3 bottom-0 text-7xl opacity-[0.12] transition group-hover:scale-110">
+                        {isActive ? "▶️" : resolvedGroup.meta.icon}
                       </div>
-                      <div className="rounded-full border border-white/80 bg-[#fff7d8] px-3 py-2 text-xs font-black text-slate-700 shadow-sm">
-                        +{mission.points_reward} điểm
+
+                      <div className="relative z-10 w-full">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="rounded-[1.2rem] border border-white/80 bg-white/76 px-3 py-2 text-xs font-black text-slate-500 shadow-sm">
+                            Video {index + 1}
+                          </div>
+                          <div className="rounded-full border border-white/80 bg-[#e0f2fe] px-3 py-2 text-xs font-black text-blue-700 shadow-sm">
+                            {isActive ? "Đang phát 🎬" : "Bấm để xem 🍿"}
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{mission.mission_type_label}</p>
+                          <h3 className="mt-2 text-2xl font-black leading-tight text-slate-800">{mission.title}</h3>
+                        </div>
+
+                        <div className="mt-4 rounded-[1.5rem] bg-white/58 px-4 py-4">
+                          <p className="line-clamp-2 text-sm font-bold leading-7 text-slate-600">{mission.description}</p>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <span className="rounded-full border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-600">
+                            ⏱️ {mission.estimated_duration_minutes} phút
+                          </span>
+                          <span className="rounded-full border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-600">
+                            💡 Sự thật thú vị
+                          </span>
+                        </div>
+
+                        <div className={`mt-5 flex items-center justify-between rounded-[1.35rem] px-4 py-3 transition ${
+                          isActive ? "bg-blue-100 text-blue-800" : "bg-[#fff7ea]/70 text-slate-700"
+                        }`}>
+                          <span className="text-sm font-black">{isActive ? "Đang xem cùng Milo" : "Xem video này"}</span>
+                          <span className="text-2xl">{isActive ? "📺" : "▶️"}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={mission.id}
+                    href={`/child/${childId}/missions/${mission.id}`}
+                    className={`group relative overflow-hidden rounded-[2.2rem] border border-white/82 bg-gradient-to-br ${resolvedGroup.meta.tone} px-5 py-5 shadow-[0_18px_36px_rgba(145,163,179,0.14)] transition hover:-translate-y-1 hover:shadow-[0_24px_44px_rgba(145,163,179,0.22)]`}
+                  >
+                    <div className="absolute inset-x-0 top-0 h-16 bg-white/28" />
+                    <div className="absolute -right-3 bottom-0 text-7xl opacity-[0.12] transition group-hover:scale-110">{resolvedGroup.meta.icon}</div>
+
+                    <div className="relative z-10">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="rounded-[1.2rem] border border-white/80 bg-white/76 px-3 py-2 text-xs font-black text-slate-500 shadow-sm">
+                          Chặng {index + 1}
+                        </div>
+                        <div className="rounded-full border border-white/80 bg-[#fff7d8] px-3 py-2 text-xs font-black text-slate-700 shadow-sm">
+                          +{mission.points_reward} điểm
+                        </div>
+                      </div>
+
+                      <div className="mt-5">
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{mission.mission_type_label}</p>
+                        <h3 className="mt-2 text-2xl font-black leading-tight text-slate-800">{mission.title}</h3>
+                      </div>
+
+                      <div className="mt-4 rounded-[1.5rem] bg-white/58 px-4 py-4">
+                        <p className="line-clamp-2 text-sm font-bold leading-7 text-slate-600">{mission.description}</p>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-600">
+                          ⏱️ {mission.estimated_duration_minutes} phút
+                        </span>
+                        <span className="rounded-full border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-600">
+                          {mission.requires_voice ? "🎤 Micro" : mission.requires_camera ? "📷 Camera" : "🫶 Không cần thiết bị"}
+                        </span>
+                      </div>
+
+                      <div className="mt-5 flex items-center justify-between rounded-[1.35rem] bg-[#fff7ea]/70 px-4 py-3">
+                        <span className="text-sm font-black text-slate-700">Vào khu này</span>
+                        <span className="text-2xl">{resolvedGroup.meta.icon}</span>
                       </div>
                     </div>
-
-                    <div className="mt-5">
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{mission.mission_type_label}</p>
-                      <h3 className="mt-2 text-2xl font-black leading-tight text-slate-800">{mission.title}</h3>
-                    </div>
-
-                    <div className="mt-4 rounded-[1.5rem] bg-white/58 px-4 py-4">
-                      <p className="line-clamp-2 text-sm font-bold leading-7 text-slate-650 text-slate-600">{mission.description}</p>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="rounded-full border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-600">
-                        ⏱️ {mission.estimated_duration_minutes} phút
-                      </span>
-                      <span className="rounded-full border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-600">
-                        {mission.requires_voice ? "🎤 Micro" : mission.requires_camera ? "📷 Camera" : "🫶 Không cần thiết bị"}
-                      </span>
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between rounded-[1.35rem] bg-[#fff7ea]/70 px-4 py-3">
-                      <span className="text-sm font-black text-slate-700">Vào khu này</span>
-                      <span className="text-2xl">{resolvedGroup.meta.icon}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </section>

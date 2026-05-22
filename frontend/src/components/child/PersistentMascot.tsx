@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { MascotVisual, type MascotMood } from "./MascotVisual";
+import { isBedtimeLockedAt } from "@/lib/child-session";
 
 const STORAGE_KEY = "kindy_mate_mascot_position";
 const MASCOT_WIDTH = 132;
@@ -65,6 +66,18 @@ function routeToState(pathname: string | null): RouteState {
 export function PersistentMascot({ childId }: { childId: string }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  const isMiloSleeping = typeof window !== "undefined" && (() => {
+    const raw = window.localStorage.getItem("bedtime_window");
+    if (!raw) return false;
+    try {
+      const windowObj = JSON.parse(raw);
+      if (windowObj?.start && windowObj?.end) {
+        return isBedtimeLockedAt(windowObj.start, windowObj.end, new Date());
+      }
+    } catch {}
+    return false;
+  })();
 
   const [position, setPosition] = useState<Position>({ x: SAFE_MARGIN, y: 128 });
   const [ready, setReady] = useState(false);
@@ -191,7 +204,10 @@ export function PersistentMascot({ childId }: { childId: string }) {
     const wasClick = movedDistance.current < 10;
     movedDistance.current = 0;
     setDragging(false);
-    if (wasClick) router.push(`/child/${childId}/milo`);
+    if (wasClick) {
+      if (isMiloSleeping) return;
+      router.push(`/child/${childId}/milo`);
+    }
   }
 
   function handlePointerCancel() {
@@ -216,9 +232,9 @@ export function PersistentMascot({ childId }: { childId: string }) {
     >
       <MascotVisual
         compact
-        mood={activeMood}
+        mood={isMiloSleeping ? "sleep" : activeMood}
         size="sm"
-        message={activeSpeech}
+        message={isMiloSleeping ? "Tớ buồn ngủ quá rồi, đi ngủ thôi cậu ơi... 💤" : activeSpeech}
       />
     </button>
   );

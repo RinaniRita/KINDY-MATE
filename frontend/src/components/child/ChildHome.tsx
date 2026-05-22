@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { apiGetRequired } from "@/lib/api";
+import { isBedtimeLockedAt } from "@/lib/child-session";
 
 import { MascotVisual } from "./MascotVisual";
 import { hubHotspots, hubSpeechByZone, type HubHotspot } from "./hubConfig";
@@ -97,6 +98,23 @@ export function ChildHome({ childId }: { childId: string }) {
     load().catch(() => setLoading(false));
   }, [childId]);
 
+  const isScreenLimitReached = useMemo(() => {
+    if (!dashboard) return false;
+    return (
+      dashboard.limit_state?.state === "offscreen_only" ||
+      (typeof dashboard.limit_state?.remaining_screen_minutes === "number" && dashboard.limit_state.remaining_screen_minutes <= 0)
+    );
+  }, [dashboard]);
+
+  const isMiloSleeping = useMemo(() => {
+    if (!dashboard?.rules?.bedtime_lock_start || !dashboard?.rules?.bedtime_lock_end) return false;
+    return isBedtimeLockedAt(
+      dashboard.rules.bedtime_lock_start,
+      dashboard.rules.bedtime_lock_end,
+      new Date()
+    );
+  }, [dashboard]);
+
   const miloLine = useMemo(() => (
     child ? buildMiloLine(child, missions, dashboard) : ""
   ), [child, missions, dashboard]);
@@ -106,7 +124,21 @@ export function ChildHome({ childId }: { childId: string }) {
     [mascotPosition],
   );
 
-  const mascotSpeech = nearbyZone ? hubSpeechByZone[nearbyZone.key] : miloLine;
+  const mascotSpeech = useMemo(() => {
+    if (isMiloSleeping) {
+      return "Khò khò... Tớ buồn ngủ quá rồi. Chúng mình đi ngủ thôi nhé! 💤🌙";
+    }
+    if (isScreenLimitReached) {
+      return "Thời gian màn hình đã hết rồi cậu ơi. Cùng sang góc vẽ hoặc thảm tập chơi nhé! 🏃🎨";
+    }
+    return nearbyZone ? hubSpeechByZone[nearbyZone.key] : miloLine;
+  }, [isMiloSleeping, isScreenLimitReached, nearbyZone, miloLine]);
+
+  const mascotMood = useMemo(() => {
+    if (isMiloSleeping) return "sleep";
+    if (isScreenLimitReached) return "rest";
+    return "hello";
+  }, [isMiloSleeping, isScreenLimitReached]);
 
   function clampPosition(nextLeft: number, nextTop: number) {
     return {
@@ -153,6 +185,7 @@ export function ChildHome({ childId }: { childId: string }) {
     const wasClick = movedDistance.current < 4;
     movedDistance.current = 0;
     if (wasClick) {
+      if (isScreenLimitReached || isMiloSleeping) return;
       router.push(`/child/${childId}/milo`);
     }
   }
@@ -194,19 +227,27 @@ export function ChildHome({ childId }: { childId: string }) {
 
         <div className="absolute inset-0 bg-gradient-to-b from-white/12 via-transparent to-white/8" />
 
-        {hubHotspots.filter((spot) => spot.key !== "milo").map((spot) => (
-          <Link
-            key={spot.key}
-            href={`/child/${childId}/${spot.hrefKey}`}
-            className="hub-hotspot z-10"
-            style={{ left: `${spot.left}%`, top: `${spot.top}%` }}
-          >
-            <span className="hub-hotspot-core">
-              <span className="hub-hotspot-ring" />
-              <span className="text-3xl">{spot.icon}</span>
-            </span>
-          </Link>
-        ))}
+        {hubHotspots.filter((spot) => spot.key !== "milo").map((spot) => {
+          const isBlocked = isScreenLimitReached && (spot.key === "study" || spot.key === "watch" || spot.key === "mascot");
+          return (
+            <Link
+              key={spot.key}
+              href={isBlocked ? "#" : `/child/${childId}/${spot.hrefKey}`}
+              onClick={(e) => {
+                if (isBlocked) {
+                  e.preventDefault();
+                }
+              }}
+              className={`hub-hotspot z-10 transition-all duration-300 ${isBlocked ? "opacity-35 cursor-not-allowed filter grayscale pointer-events-none" : "hover:scale-110 active:scale-95"}`}
+              style={{ left: `${spot.left}%`, top: `${spot.top}%` }}
+            >
+              <span className="hub-hotspot-core relative">
+                <span className="hub-hotspot-ring" />
+                <span className="text-3xl">{isBlocked ? "🔒" : spot.icon}</span>
+              </span>
+            </Link>
+          );
+        })}
 
         <button
           type="button"
@@ -224,7 +265,7 @@ export function ChildHome({ childId }: { childId: string }) {
             </div>
             <div className="absolute inset-x-8 bottom-3 h-12 rounded-full bg-white/55 blur-xl" />
             <div className="relative scale-[0.8] md:scale-[0.92]">
-              <MascotVisual mood="hello" size="md" message="" />
+              <MascotVisual mood={mascotMood} size="md" message="" />
             </div>
             <div className="absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full border border-white/80 bg-white/86 px-3 py-1 text-xs font-black text-slate-700 shadow-sm">
               Milo

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { PersistentMascot } from "@/components/child/PersistentMascot";
+import { MascotVisual } from "@/components/child/MascotVisual";
 import { apiGet, apiPatch, apiPost, apiPostWithStatus, type AuthResponse } from "@/lib/api";
 import {
   clearChildModeSession,
@@ -15,6 +16,8 @@ import {
   updateChildModeSegment,
   type LimitState,
   writeChildModeSession,
+  isBedtimeLockedAt,
+  parseClock,
 } from "@/lib/child-session";
 import { readAuthSession, updateAuthUser } from "@/lib/auth";
 
@@ -58,31 +61,6 @@ function breakRemainingMinutes(limitState: LimitState | null) {
   return Math.max(Math.ceil((end - Date.now()) / 60_000), 0);
 }
 
-function parseClock(raw: string | null) {
-  if (!raw) return null;
-  const [hourText = "0", minuteText = "0", secondText = "0"] = raw.split(":");
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  const second = Number(secondText);
-  if ([hour, minute, second].some((value) => Number.isNaN(value))) return null;
-  return { hour, minute, second };
-}
-
-function isBedtimeLockedAt(startRaw: string | null, endRaw: string | null, now: Date) {
-  const start = parseClock(startRaw);
-  const end = parseClock(endRaw);
-  if (!start || !end) return false;
-
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const startMinutes = start.hour * 60 + start.minute;
-  const endMinutes = end.hour * 60 + end.minute;
-
-  if (startMinutes < endMinutes) {
-    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
-  }
-  return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
-}
-
 function secondsUntilNextBedtimeStart(startRaw: string | null, endRaw: string | null, now: Date) {
   const start = parseClock(startRaw);
   if (!start || isBedtimeLockedAt(startRaw, endRaw, now)) return null;
@@ -124,6 +102,13 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   const [limitState, setLimitState] = useState<LimitState | null>(null);
   const [bedtimeWindow, setBedtimeWindow] = useState<BedtimeWindow | null>(null);
   const [clockTick, setClockTick] = useState(() => Date.now());
+  const [bedtimeBypassed, setBedtimeBypassed] = useState(false);
+
+  useEffect(() => {
+    if (bedtimeWindow) {
+      localStorage.setItem("bedtime_window", JSON.stringify(bedtimeWindow));
+    }
+  }, [bedtimeWindow]);
 
   useEffect(() => {
     if (tone === "child" && !hasParentPin()) {
@@ -138,12 +123,61 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   const childHomeHref = childId ? `/child/${childId}/home` : "/child/select-profile";
   const currentSegmentDescriptor = useMemo(() => segmentDescriptorForPath(pathname), [pathname]);
   const remainingBreakMinutes = breakRemainingMinutes(limitState);
+  
   const bedtimeCountdownSeconds = useMemo(() => {
     if (!bedtimeWindow) return null;
     return secondsUntilNextBedtimeStart(bedtimeWindow.start, bedtimeWindow.end, new Date(clockTick));
   }, [bedtimeWindow, clockTick]);
+
   const shouldShowBedtimeTimer =
-    typeof bedtimeCountdownSeconds === "number" && bedtimeCountdownSeconds > 0 && bedtimeCountdownSeconds <= 5 * 60;
+    typeof bedtimeCountdownSeconds === "number" && bedtimeCountdownSeconds > 0 && bedtimeCountdownSeconds <= 15 * 60;
+
+  const isBedtimeLocked = useMemo(() => {
+    if (!isChildTone || !bedtimeWindow || bedtimeBypassed) return false;
+    return isBedtimeLockedAt(bedtimeWindow.start, bedtimeWindow.end, new Date(clockTick));
+  }, [isChildTone, bedtimeWindow, clockTick, bedtimeBypassed]);
+
+  const isSessionLocked = useMemo(() => {
+    return isChildTone && (
+      limitState?.state === "session_limit_reached" || 
+      limitState?.state === "ended" || 
+      (limitState && typeof limitState.remaining_session_minutes === "number" && limitState.remaining_session_minutes <= 0)
+    );
+  }, [isChildTone, limitState]);
+
+  const isBlockedOffscreenRoute = useMemo(() => {
+    return Boolean(
+      pathname?.includes("/study") ||
+      pathname?.includes("/watch") ||
+      pathname?.includes("/mascot") ||
+      pathname?.includes("/milo") ||
+      pathname?.includes("/missions/") ||
+      pathname?.includes("/mission/")
+    );
+  }, [pathname]);
+
+  const isOffscreenLocked = useMemo(() => {
+    return isChildTone && 
+      !isBedtimeLocked && 
+      !isSessionLocked &&
+      (limitState?.state === "offscreen_only" || (limitState && typeof limitState.remaining_screen_minutes === "number" && limitState.remaining_screen_minutes <= 0)) && 
+      isBlockedOffscreenRoute;
+  }, [isChildTone, isBedtimeLocked, isSessionLocked, limitState, isBlockedOffscreenRoute]);
+
+  const showSessionNudge = isChildTone && limitState && typeof limitState.remaining_session_minutes === "number" && limitState.remaining_session_minutes > 0 && limitState.remaining_session_minutes <= 15;
+  const showBedtimeNudge = isChildTone && typeof bedtimeCountdownSeconds === "number" && bedtimeCountdownSeconds > 0 && bedtimeCountdownSeconds <= 15 * 60;
+
+  const minutesUntilBedtime = useMemo(() => {
+    if (typeof bedtimeCountdownSeconds !== "number" || bedtimeCountdownSeconds <= 0) return null;
+    return Math.ceil(bedtimeCountdownSeconds / 60);
+  }, [bedtimeCountdownSeconds]);
+
+  const isWithinOneHourOfBedtime = useMemo(() => {
+    return typeof minutesUntilBedtime === "number" && minutesUntilBedtime <= 60;
+  }, [minutesUntilBedtime]);
+
+
+
 
   useEffect(() => {
     if (tone !== "child" || typeof window === "undefined") return;
@@ -188,10 +222,10 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
   }, [childId, isChildTone]);
 
   useEffect(() => {
-    if (!isChildTone || !bedtimeWindow?.start) return;
+    if (!isChildTone) return;
     const timer = setInterval(() => setClockTick(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [bedtimeWindow?.start, isChildTone]);
+  }, [isChildTone]);
 
   useEffect(() => {
     if (!isChildTone || !childId) return;
@@ -296,18 +330,17 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
     };
   }, [childId, isChildTone]);
 
+  // We disable immediate redirection on limitState ended/reached to let our premium locking overlay block interaction beautifully.
   useEffect(() => {
     if (!limitState || !isChildTone) return;
-    if (limitState.state === "session_limit_reached" || limitState.state === "ended") {
-      clearChildModeSession();
-      router.push("/child/select-profile");
-    }
+    // We let the full screen session expiry overlay block interaction, allowing parent passcode verification to bypass or end it.
   }, [isChildTone, limitState, router]);
 
   async function handleStartSession() {
     if (typeof window === "undefined") return;
     const activeChildId = childId || window.localStorage.getItem("active_child_id") || "";
     if (!activeChildId) return;
+    if (isWithinOneHourOfBedtime) return;
     setSessionBusy(true);
 
     try {
@@ -353,6 +386,7 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
       // keep moving to target even if backend has already closed the session
     } finally {
       clearChildModeSession();
+      setBedtimeBypassed(false);
       setShowChildEndModal(false);
       setShowParentExitModal(false);
       setSessionBusy(false);
@@ -444,6 +478,11 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
       await apiPost<{ ok: boolean }>("/auth/verify-parent-pin/", { pin: nextPin });
       handleClear();
       setShowPasscodeModal(false);
+
+      if (isBedtimeLocked) {
+        setBedtimeBypassed(true);
+        return;
+      }
 
       if (readChildModeSession()?.childModeSessionId) {
         setShowParentExitModal(true);
@@ -690,30 +729,60 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
       {showStartSessionModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] border border-white/40 bg-white p-8 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-[#f3fbf7] text-3xl font-black text-slate-700">
-              KM
-            </div>
-            <h3 className="text-xl font-black text-slate-800">Bắt đầu tính giờ sử dụng?</h3>
-            <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
-              Nếu phụ huynh đồng ý, hệ thống sẽ bắt đầu theo dõi phiên child mode, screen time và thời gian nghỉ ngoài màn hình theo thời gian thực.
-            </p>
-            <div className="mt-6 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={handleStartSession}
-                disabled={sessionBusy}
-                className="w-full rounded-[1.25rem] bg-[#9dd9c6] py-3 text-xs font-black text-slate-800 shadow-md"
-              >
-                {sessionBusy ? "Đang bắt đầu..." : "Bắt đầu theo dõi"}
-              </button>
-              <button
-                type="button"
-                onClick={handleSkipSession}
-                className="w-full rounded-[1.25rem] border border-slate-200 bg-white py-3 text-xs font-black text-slate-600"
-              >
-                Không tính giờ lần này
-              </button>
-            </div>
+            {isWithinOneHourOfBedtime ? (
+              <>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-amber-50 text-3xl font-black text-slate-700">
+                  🌙
+                </div>
+                <h3 className="text-xl font-black text-slate-800">Sắp đến giờ ngủ rồi! 🌙</h3>
+                <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
+                  Chỉ còn chưa đầy 1 tiếng nữa là đến giờ đi ngủ của cậu rồi ({minutesUntilBedtime} phút). Milo khuyên cậu không nên bắt đầu phiên mới vào lúc này để ngủ thật ngon nhé!
+                </p>
+                <div className="mt-6 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void endChildMode("select-profile")}
+                    className="w-full rounded-[1.25rem] bg-[#91d0f6] py-3 text-xs font-black text-slate-800 shadow-md"
+                  >
+                    👋 Quay lại chọn hồ sơ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openParentGate()}
+                    className="w-full rounded-[1.25rem] border border-slate-200 bg-white py-3 text-xs font-black text-slate-600"
+                  >
+                    ⚙️ Bố mẹ mở khóa
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-[#f3fbf7] text-3xl font-black text-slate-700">
+                  KM
+                </div>
+                <h3 className="text-xl font-black text-slate-800">Bắt đầu tính giờ sử dụng?</h3>
+                <p className="mt-2 text-xs font-bold leading-relaxed text-slate-500">
+                  Nếu phụ huynh đồng ý, hệ thống sẽ bắt đầu theo dõi phiên child mode, screen time và thời gian nghỉ ngoài màn hình theo thời gian thực.
+                </p>
+                <div className="mt-6 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleStartSession}
+                    disabled={sessionBusy}
+                    className="w-full rounded-[1.25rem] bg-[#9dd9c6] py-3 text-xs font-black text-slate-800 shadow-md"
+                  >
+                    {sessionBusy ? "Đang bắt đầu..." : "Bắt đầu theo dõi"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSkipSession}
+                    className="w-full rounded-[1.25rem] border border-slate-200 bg-white py-3 text-xs font-black text-slate-600"
+                  >
+                    Không tính giờ lần này
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}
@@ -780,7 +849,7 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
         </div>
       ) : null}
 
-      {isChildTone && limitState && (limitState.state === "break_required" || limitState.state === "offscreen_only") ? (
+      {isChildTone && limitState && (limitState.state === "break_required" || limitState.state === "offscreen_only") && !isOffscreenLocked ? (
         <div className="fixed inset-x-4 bottom-20 z-40 mx-auto max-w-lg rounded-[2rem] border border-white/80 bg-white/95 p-5 shadow-2xl backdrop-blur">
           <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
             {limitState.state === "break_required" ? "Nghỉ màn hình" : "Chỉ còn hoạt động ngoài màn hình"}
@@ -810,6 +879,129 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
                 <span>Tớ đã nghỉ xong</span>
               </button>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* 15-Minute Soft Nudges */}
+      {(showSessionNudge || showBedtimeNudge) && (
+        <div className="fixed bottom-24 right-4 z-40 max-w-sm rounded-[1.6rem] bg-white/95 p-4 shadow-xl border border-amber-200/60 backdrop-blur flex items-center gap-3 animate-slide-up">
+          <div className="text-3xl">💬</div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-600">Milo mách nhỏ</p>
+            <p className="text-xs font-bold leading-relaxed text-slate-700">
+              {showBedtimeNudge
+                ? `Sắp đến giờ đi ngủ rồi (còn ${Math.ceil((bedtimeCountdownSeconds ?? 0) / 60)} phút)! Chúng mình chơi nốt một chút rồi chuẩn bị nghỉ nhé! 🛌`
+                : `Phiên chơi sắp hết giờ rồi (còn ${Math.ceil(limitState?.remaining_session_minutes ?? 0)} phút)! Hãy chuẩn bị hoàn thành nhiệm vụ nha! ⏰`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Bedtime Lock Overlay */}
+      {isBedtimeLocked ? (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0B0F19] text-white p-8 text-center animate-fade-in select-none">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-transparent to-transparent opacity-80 pointer-events-none" />
+          
+          <div className="relative mb-6 animate-pulse duration-4000">
+            <span className="text-8xl filter drop-shadow-[0_0_15px_rgba(251,191,36,0.4)]">🌙</span>
+            <span className="absolute top-0 right-[-10px] text-3xl animate-bounce">✨</span>
+          </div>
+
+          <div className="scale-110 mb-8">
+            <MascotVisual mood="sleep" size="lg" message="" />
+          </div>
+
+          <h2 className="text-3xl font-black tracking-tight text-amber-200">Đã đến giờ đi ngủ rồi cậu ơi! 🛌💤</h2>
+          <p className="mt-4 max-w-md text-sm font-medium leading-relaxed text-indigo-200/90">
+            Hôm nay chúng mình đã học tập và vui chơi thật chăm chỉ rồi. Giờ là lúc để máy xuống, đi ngủ sớm để ngày mai tràn đầy năng lượng nhé! Milo chúc cậu ngủ ngon! 🌟🌙
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 min-w-[200px]">
+            <button
+              type="button"
+              onClick={() => void endChildMode("select-profile")}
+              className="rounded-[1.25rem] bg-[#91d0f6] px-6 py-3 text-xs font-black text-slate-800 shadow-lg shadow-blue-500/20 active:scale-95 transition"
+            >
+              👋 Hẹn gặp lại sau nhé
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openParentGate()}
+            className="absolute bottom-6 right-6 opacity-30 hover:opacity-100 transition text-[10px] uppercase font-black tracking-widest text-slate-400"
+          >
+            ⚙️ Cổng phụ huynh
+          </button>
+        </div>
+      ) : null}
+
+      {/* Session ended Lock Overlay */}
+      {isSessionLocked && !isBedtimeLocked ? (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-[#FFFDF7] via-[#FFF3E3] to-[#FFF9F0] text-slate-800 p-8 text-center animate-fade-in select-none">
+          <div className="relative mb-6">
+            <span className="text-8xl filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.08)]">⏰</span>
+          </div>
+
+          <div className="scale-110 mb-8">
+            <MascotVisual mood="sleep" size="lg" message="" />
+          </div>
+
+          <h2 className="text-3xl font-black tracking-tight text-slate-800">Hết giờ chơi rồi cậu ơi! ⏰</h2>
+          <p className="mt-4 max-w-md text-sm font-bold leading-relaxed text-slate-600">
+            Phiên sử dụng của chúng mình hôm nay đã kết thúc rồi. Cậu hãy cất máy, để đôi mắt nghỉ ngơi và hẹn gặp lại cậu ở phiên chơi tiếp theo nhé! 🥰🌱
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 min-w-[200px]">
+            <button
+              type="button"
+              onClick={() => void endChildMode("select-profile")}
+              className="rounded-[1.25rem] bg-[#9dd9c6] px-6 py-3 text-xs font-black text-slate-800 shadow-lg active:scale-95 transition"
+            >
+              👋 Kết thúc phiên chơi
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openParentGate()}
+            className="absolute bottom-6 right-6 opacity-30 hover:opacity-100 transition text-[10px] uppercase font-black tracking-widest text-slate-400"
+          >
+            ⚙️ Cổng phụ huynh
+          </button>
+        </div>
+      ) : null}
+
+      {/* Offscreen Screen Time Lock Overlay */}
+      {isOffscreenLocked ? (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-[#FFFDF7] via-[#EBF6FF] to-[#E9FAFF] text-slate-800 p-8 text-center animate-fade-in select-none">
+          <div className="relative mb-6 animate-bounce">
+            <span className="text-8xl">🔌👁️</span>
+          </div>
+
+          <div className="scale-110 mb-8">
+            <MascotVisual mood="rest" size="lg" message="" />
+          </div>
+
+          <h2 className="text-2xl font-black tracking-tight text-indigo-900">Hãy bảo vệ đôi mắt nhé! 🔌👁️</h2>
+          <p className="mt-4 max-w-md text-sm font-bold leading-relaxed text-indigo-950/80">
+            Thời gian dùng màn hình của cậu đã hết rồi. Để đôi mắt của chúng mình luôn tinh anh, hãy đứng dậy vận động hoặc vẽ tranh nha! Milo có sẵn bài tập cực vui cho cậu đó! 🏃🎨
+          </p>
+
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <Link
+              href={`/child/${childId}/move`}
+              className="rounded-[1.25rem] bg-[#91d0f6] px-6 py-3.5 text-xs font-black text-slate-800 shadow-md shadow-blue-500/10 active:scale-95 transition flex items-center gap-2"
+            >
+              🤸 Thảm tập thể dục
+            </Link>
+            <Link
+              href={`/child/${childId}/create`}
+              className="rounded-[1.25rem] bg-[#ffe39a] px-6 py-3.5 text-xs font-black text-slate-800 shadow-md shadow-amber-500/10 active:scale-95 transition flex items-center gap-2"
+            >
+              🎨 Góc sáng tạo vẽ tranh
+            </Link>
           </div>
         </div>
       ) : null}

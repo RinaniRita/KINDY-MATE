@@ -4,6 +4,7 @@ export const missionCategoryOrder = [
   "van_dong",
   "ky_nang_song",
   "sang_tao",
+  "su_that_thu_vi",
 ];
 
 export const rewardCategoryOrder = [
@@ -20,6 +21,7 @@ export const missionCategoryMeta: Record<string, { label: string; tone: string; 
   van_dong: { label: "Vận động", tone: "from-[#fff4c8] to-[#fff9e7]", icon: "🤸" },
   ky_nang_song: { label: "Kỹ năng sống", tone: "from-[#f8ead7] to-[#fff5ea]", icon: "🌱" },
   sang_tao: { label: "Sáng tạo", tone: "from-[#efe8ff] to-[#f7f4ff]", icon: "🎨" },
+  su_that_thu_vi: { label: "Những Sự Thật Thú Vị", tone: "from-[#e0f2fe] to-[#f0fdf4]", icon: "💡" },
 };
 
 export const rewardCategoryMeta: Record<string, { label: string; tone: string; icon: string }> = {
