@@ -124,20 +124,28 @@ export async function apiPostWithStatus<T>(
   path: string,
   body: unknown,
 ): Promise<{ ok: boolean; status: number; data: T | Record<string, unknown> }> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    body: JSON.stringify(body),
-    headers: getHeaders(),
-    method: "POST",
-  });
-  const data = (await response.json().catch(() => ({}))) as T | Record<string, unknown>;
-  if (response.status === 401) {
-    clearAuthSession();
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      body: JSON.stringify(body),
+      headers: getHeaders(),
+      method: "POST",
+    });
+    const data = (await response.json().catch(() => ({}))) as T | Record<string, unknown>;
+    if (response.status === 401) {
+      clearAuthSession();
+    }
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      data: { error: error instanceof Error ? error.message : "Failed to fetch" },
+    };
   }
-  return {
-    ok: response.ok,
-    status: response.status,
-    data,
-  };
 }
 export async function apiStream(
   path: string,
