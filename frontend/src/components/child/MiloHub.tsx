@@ -210,7 +210,19 @@ export function MiloHub({ childId }: { childId: string }) {
         },
         // onDone — finalize mood
         () => {
-          setMiloMood(replyToMood(accumulated));
+          if (!accumulated) {
+            setMessages((prev) => {
+              const next = [...prev];
+              const idx = streamingIndexRef.current;
+              if (idx >= 0 && next[idx]) {
+                next[idx] = { role: "assistant", content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️" };
+              }
+              return next;
+            });
+            setMiloMood("rest");
+          } else {
+            setMiloMood(replyToMood(accumulated));
+          }
           setSending(false);
           streamingIndexRef.current = -1;
         },

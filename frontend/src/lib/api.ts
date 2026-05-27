@@ -160,21 +160,59 @@ export async function apiStream(
 ): Promise<void> {
   const token = getAccessToken();
   const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok || !response.body) throw new Error(`Stream failed: ${response.status}`);
+  console.log('[Milo] apiStream calling:', url);
+  console.log('[Milo] Token present:', !!token);
+
+  const controller = new AbortController();
+
+  // Watchdog timer to prevent stream hanging (10s threshold, checks every 2s)
+  let lastActivity = Date.now();
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastActivity > 10000) {
+      console.error('[Milo] Stream watchdog timeout. Aborting...');
+      controller.abort();
+      clearInterval(watchdog);
+    }
+  }, 2000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (fetchErr) {
+    clearInterval(watchdog);
+    const error = fetchErr as Error;
+    if (error.name === 'AbortError') {
+      console.error('[Milo] fetch() timed out or aborted');
+      throw new Error('Connection timed out');
+    }
+    console.error('[Milo] fetch() failed (network error):', fetchErr);
+    throw fetchErr;
+  }
+
+  if (!response.ok || !response.body) {
+    clearInterval(watchdog);
+    console.error('[Milo] Stream failed with status:', response.status);
+    throw new Error(`Stream failed: ${response.status}`);
+  }
+
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let receivedDone = false;
+
   try {
     while (true) {
       const { done, value } = await reader.read();
+      lastActivity = Date.now(); // Update timestamp on chunk activity
+
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -185,12 +223,23 @@ export async function apiStream(
           const parsed = JSON.parse(line.slice(6)) as { chunk?: string; audio?: string; done: boolean };
           if (parsed.chunk) onChunk(parsed.chunk);
           if (parsed.audio && onAudio) onAudio(parsed.audio);
-          if (parsed.done) { onDone(); return; }
+          if (parsed.done) {
+            receivedDone = true;
+            onDone();
+            return;
+          }
         } catch { /* ignore malformed */ }
       }
     }
   } finally {
+    clearInterval(watchdog);
     reader.releaseLock();
   }
+
+  if (!receivedDone) {
+    console.error('[Milo] Stream terminated prematurely without done signal');
+    throw new Error('Stream terminated prematurely');
+  }
+
   onDone();
 }
