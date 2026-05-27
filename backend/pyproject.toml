@@ -16,7 +16,6 @@ dependencies = [
     "redis>=7.4.0",
     "google-genai>=1.0.0",
     "gunicorn>=23.0.0",
-    "gevent>=24.2.1",
 ]
 
 [dependency-groups]

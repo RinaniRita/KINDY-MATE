@@ -111,6 +111,22 @@ docker compose stop frontend
 # (On Windows Powershell):
 Remove-Item -Recurse -Force ./frontend/.next
 # (On macOS/Linux):
+
+## Troubleshooting & Common Issues
+
+### 1. Dynamic Routing Returns 404 (Stale Cache)
+In development, Next.js (with Turbopack) caches route maps inside the `.next` directory. Since this folder is mapped to the host disk, a compiler crash (e.g. from missing or ignored library imports) can cause Next.js to get stuck serving a cached "404 Not Found" state even after the code has been corrected and the Docker container restarted.
+
+**Solution:**
+Wipe the dynamic compiler cache folder on the host and restart the service:
+```bash
+# 1. Stop the frontend container
+docker compose stop frontend
+
+# 2. Delete the cache folder on the host
+# (On Windows Powershell):
+Remove-Item -Recurse -Force ./frontend/.next
+# (On macOS/Linux):
 rm -rf ./frontend/.next
 
 # 3. Start the container back up (forces a fresh from-scratch compilation)
@@ -124,3 +140,23 @@ If a custom child mission sub-component (such as `MathPicturesMission` or a cust
 *   A **3-second backup timer** is integrated inside `MissionDetail.tsx` that forcefully sets `loading` to `false` even if the backend fetch hangs.
 *   Check the browser's JavaScript developer console (`F12`) to catch the specific component runtime crash (e.g. division by zero, undefined layout states, or unseeded properties).
 
+### 3. Microphone / Speech Recognition Not Working
+
+The browser's **Web Speech API** only works in a [Secure Context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts):
+
+| URL you open | Mic works? |
+|---|---|
+| `http://localhost:3000` | ✅ Yes |
+| `http://127.0.0.1:3000` | ✅ Yes |
+| `http://192.168.x.x:3000` (LAN IP) | ❌ No — plain HTTP + non-localhost |
+| `https://...` | ✅ Yes |
+
+**Common fixes:**
+
+- **"not-allowed" error** — The browser blocked mic access. Click the 🔒 icon in the address bar → **Allow Microphone** → refresh the page.
+- **Accessing via LAN IP** — Open `http://localhost:3000` instead. Speech API is disabled on plain HTTP non-localhost origins.
+- **Browser compatibility** — Chrome and Edge have full support. Firefox has partial support. Safari on iOS requires a tap gesture before accessing the mic.
+- **Permission denied permanently** — Go to browser Settings → Privacy → Site Settings → Microphone → find `localhost` and set to "Allow".
+
+> [!NOTE]
+> The in-app mic button will display a yellow warning banner with the specific reason if the browser blocks access, making it easier to diagnose.

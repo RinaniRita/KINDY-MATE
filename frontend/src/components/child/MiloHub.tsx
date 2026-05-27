@@ -84,6 +84,8 @@ export function MiloHub({ childId }: { childId: string }) {
   const [miloMood, setMiloMood]   = useState<MascotMood>("hello");
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [micError, setMicError] = useState<string | null>(null);
+  const [micSupported, setMicSupported] = useState(true);
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const streamingIndexRef = useRef<number>(-1);
@@ -116,38 +118,62 @@ export function MiloHub({ childId }: { childId: string }) {
 
   // Initialize Speech Recognition
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "vi-VN";
-        
-        recognition.onresult = (event: any) => {
-          let currentInterim = "";
-          let finalTrans = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTrans += event.results[i][0].transcript;
-            } else {
-              currentInterim += event.results[i][0].transcript;
-            }
-          }
-          if (finalTrans) {
-            setInputText((prev) => prev + finalTrans + " ");
-          }
-          setInterimTranscript(currentInterim);
-        };
-        
-        recognition.onerror = (event: any) => {
-          console.error("Speech recognition error", event.error);
-          setIsListening(false);
-        };
-        
-        recognitionRef.current = recognition;
-      }
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setMicSupported(false);
+      return;
     }
+
+    // Check if we are on a secure context (https or localhost).
+    // Speech API is blocked by browsers on plain HTTP non-localhost origins.
+    if (!window.isSecureContext) {
+      setMicSupported(false);
+      setMicError("Mic chỉ hoạt động khi truy cập qua https:// hoặc localhost. Hãy mở http://localhost:3000 thay vì dùng địa chỉ IP.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "vi-VN";
+
+    recognition.onresult = (event: any) => {
+      let currentInterim = "";
+      let finalTrans = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTrans += event.results[i][0].transcript;
+        } else {
+          currentInterim += event.results[i][0].transcript;
+        }
+      }
+      if (finalTrans) {
+        setInputText((prev) => prev + finalTrans + " ");
+      }
+      setInterimTranscript(currentInterim);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setMicError("Trình duyệt chưa cấp quyền mic. Hãy nhấn vào biểu tượng 🔒 trên thanh địa chỉ → cho phép Microphone, rồi tải lại trang.");
+        setMicSupported(false);
+      } else if (event.error === "no-speech") {
+        // Benign — user didn't say anything, just reset quietly
+      } else if (event.error === "network") {
+        setMicError("Lỗi mạng khi xử lý giọng nói. Kiểm tra kết nối và thử lại.");
+      }
+    };
+
+    recognition.onend = () => {
+      // If recognition stops unexpectedly while we think we're listening, reset state
+      setIsListening((prev) => { if (prev) return false; return prev; });
+    };
+
+    recognitionRef.current = recognition;
   }, []);
 
   const playNextAudio = useCallback(() => {
@@ -255,13 +281,29 @@ export function MiloHub({ childId }: { childId: string }) {
     }
   }
 
-  const startListening = () => {
-    if (recognitionRef.current && !sending) {
-      setInputText("");
-      setInterimTranscript("");
-      setIsListening(true);
-      recognitionRef.current.start();
+  const startListening = async () => {
+    if (!recognitionRef.current || sending || !micSupported) return;
+
+    // Request mic permission explicitly so the browser shows the permission prompt
+    // before we call recognition.start(), avoiding the silent "not-allowed" error.
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err: any) {
+      const isDenied = err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError";
+      setMicError(
+        isDenied
+          ? "Bạn đã từ chối quyền mic. Nhấn biểu tượng 🔒 trên thanh địa chỉ → cho phép Microphone."
+          : "Không tìm thấy thiết bị mic. Hãy cắm mic và thử lại."
+      );
+      setMicSupported(false);
+      return;
     }
+
+    setMicError(null);
+    setInputText("");
+    setInterimTranscript("");
+    setIsListening(true);
+    recognitionRef.current.start();
   };
 
   const stopListening = () => {
@@ -368,7 +410,23 @@ export function MiloHub({ childId }: { childId: string }) {
               </div>
             </div>
 
-            <div className="mt-6 border-t border-slate-100/50 pt-5 flex flex-col items-center">
+            <div className="mt-6 border-t border-slate-100/50 pt-5 flex flex-col items-center gap-3">
+              {/* Mic error banner */}
+              {micError && (
+                <div className="w-full rounded-[1.4rem] bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2">
+                  <span className="text-amber-500 text-lg flex-shrink-0">⚠️</span>
+                  <p className="text-xs font-bold text-amber-800 leading-relaxed flex-1">{micError}</p>
+                  <button
+                    type="button"
+                    onClick={() => setMicError(null)}
+                    className="text-amber-400 hover:text-amber-600 text-base leading-none flex-shrink-0"
+                    aria-label="Đóng thông báo"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <button
                 type="button"
                 onMouseDown={startListening}
@@ -376,10 +434,10 @@ export function MiloHub({ childId }: { childId: string }) {
                 onMouseLeave={stopListening}
                 onTouchStart={startListening}
                 onTouchEnd={stopListening}
-                disabled={sending}
+                disabled={sending || !micSupported}
                 className={`group relative flex h-20 w-full max-w-[280px] items-center justify-center rounded-[2rem] font-black shadow-lg transition-all duration-300 select-none ${
-                  sending
-                    ? "bg-slate-200 text-slate-400 opacity-70"
+                  sending || !micSupported
+                    ? "bg-slate-200 text-slate-400 opacity-70 cursor-not-allowed"
                     : isListening
                     ? "bg-emerald-400 text-white scale-[0.98] shadow-inner"
                     : "bg-gradient-to-r from-[#9dd9c6] to-[#bde6d9] text-slate-800 hover:shadow-xl hover:scale-[1.02]"
@@ -392,19 +450,19 @@ export function MiloHub({ childId }: { childId: string }) {
                 <span className="relative z-10 flex items-center gap-3 text-lg">
                   {sending ? (
                     "Đang gửi..."
+                  ) : !micSupported ? (
+                    <>🎤 Mic không khả dụng</>
                   ) : isListening ? (
                     <>
                       <span className="animate-pulse">🔴</span> Đang nghe...
                     </>
                   ) : (
-                    <>
-                      🎤 Nhấn giữ để nói
-                    </>
+                    <>🎤 Nhấn giữ để nói</>
                   )}
                 </span>
               </button>
 
-              <div className="mt-4 flex gap-3">
+              <div className="flex gap-3">
                 <Link
                   href={`/child/${childId}/mascot`}
                   className="rounded-[1.4rem] border border-slate-200 bg-white px-5 py-3 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 transition"
