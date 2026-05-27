@@ -123,3 +123,5 @@ celerybeat.pid
 ehthumbs.db
 Thumbs.db
 .agent/
+
+repomix-output.xml
