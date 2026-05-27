@@ -10,43 +10,91 @@ This project is built using a modern decoupled architecture:
    - Feature-Sliced Design (FSD)
    - Tailwind CSS v4 Global Design System
    - Lives in `/frontend`
-   - Run with `pnpm dev`
+   - Served by the `frontend` Docker service
 
 2. **Backend (Django 5.1 + Python 3.11)**
    - Modular Apps: Authentication, Profiles, Learning, Gamification, AI Agent, Activity Logger
    - Postgres & Redis
    - Managed with `uv`
    - Lives in `/backend`
-   - Run with `uv run manage.py runserver`
+   - Served by the `backend` Docker service
 
 ## Getting Started
 
-Make sure you have [Docker](https://www.docker.com/), [uv](https://github.com/astral-sh/uv), and [pnpm](https://pnpm.io/) installed.
+The local development stack runs through Docker Compose. You do not need to install or run `uv`, `pnpm`, Postgres, or Redis directly on your machine.
+
+Make sure you have [Docker](https://www.docker.com/) installed.
 
 ### 1. Environment
-Copy `.env.example` to `.env` and configure your local keys.
+Copy `.env.example` to `.env` and configure any local or optional AI provider keys:
 
-### 2. Services
-Run the database layer via Docker:
 ```bash
-docker-compose up -d
+cp .env.example .env
 ```
 
-### 3. Backend Setup
+On Windows PowerShell:
+
 ```bash
-cd backend
+Copy-Item .env.example .env
+```
+
+### 2. Start the App
+Build and start the full stack:
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+- `db`: PostgreSQL on `localhost:5432`
+- `redis`: Redis on `localhost:6379`
+- `backend`: Django API on `http://localhost:8000`
+- `frontend`: Next.js app on `http://localhost:3000`
+
+During backend startup, Docker Compose runs migrations and seeds demo/curated content automatically:
+
+```bash
 uv run manage.py migrate
-uv run manage.py runserver
+uv run manage.py seed_demo
+uv run manage.py seed_curated_content
 ```
 
-### 4. Frontend Setup
+Visit `http://localhost:3000` to use the application.
+
+### 3. Useful Commands
+
+Run the stack in the background:
+
 ```bash
-cd frontend
-pnpm install
-pnpm dev
+docker compose up -d --build
 ```
 
-Visit `http://localhost:3000` to see the application!
+View service logs:
+
+```bash
+docker compose logs -f backend
+docker compose logs -f frontend
+```
+
+Run a Django management command inside the backend container:
+
+```bash
+docker compose exec backend uv run manage.py <command>
+```
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+Reset local database data:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
 
 ## Troubleshooting & Common Issues
 
