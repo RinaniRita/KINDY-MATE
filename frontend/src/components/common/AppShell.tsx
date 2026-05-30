@@ -291,17 +291,22 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
 
   const themeTag = tone === "child" ? "Khu trẻ em" : tone === "parent" ? "Phụ huynh" : "Kindy-Mate";
 
-  const logoHref = useMemo(() => {
-    let computedHref = "/";
-    if (tone === "parent") {
-      computedHref = "/parent/dashboard";
-    } else if (tone === "child" && typeof window !== "undefined") {
-      const activeChildId = window.localStorage.getItem("active_child_id") || "";
-      computedHref = activeChildId ? `/child/${activeChildId}/home` : "/child/select-profile";
-    } else if (readAuthSession()?.access) {
-      computedHref = "/parent/dashboard";
-    }
-    return computedHref;
+  // Derive a safe SSR default that matches what the server would render,
+  // then update on the client after hydration to avoid a mismatch.
+  const ssrLogoHref = tone === "parent" ? "/parent/dashboard" : "/";
+  const [logoHref, setLogoHref] = useState(ssrLogoHref);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (tone === "child") {
+        const activeChildId = window.localStorage.getItem("active_child_id") || "";
+        setLogoHref(activeChildId ? `/child/${activeChildId}/home` : "/child/select-profile");
+      } else if (tone !== "parent" && readAuthSession()?.access) {
+        setLogoHref("/parent/dashboard");
+      }
+    });
+    // tone === "parent" is already correct from the initial useState value
+    return () => window.cancelAnimationFrame(frame);
   }, [tone]);
 
   const handleClear = useCallback(() => {

@@ -4,6 +4,7 @@ JWT auth, request parsing, and streaming all happen here directly.
 """
 import json
 import asyncio
+import base64
 
 from django.conf import settings
 
@@ -14,6 +15,24 @@ from apps.ai_agent.views import (
     _fallback_reply,
     get_milo_system_prompt,
 )
+
+TTS_VOICE = "vi-VN-HoaiMyNeural"
+TTS_TIMEOUT_SECONDS = 12
+
+
+async def generate_audio_base64(text: str, voice: str = TTS_VOICE) -> str:
+    import edge_tts
+
+    communicate = edge_tts.Communicate(text, voice)
+    audio_data = b""
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_data += chunk["data"]
+    return base64.b64encode(audio_data).decode("utf-8")
+
+
+def _sse_audio_event(audio_url: str) -> str:
+    return f"data: {json.dumps({'audio': audio_url, 'done': False})}\n\n"
 
 
 async def milo_stream_app(scope, receive, send):
@@ -128,6 +147,20 @@ async def milo_stream_app(scope, receive, send):
         chunk_count += 1
 
     print(f"[Milo] Streamed {chunk_count} chunks to client")
+    try:
+        audio_b64 = await asyncio.wait_for(
+            generate_audio_base64(reply),
+            timeout=TTS_TIMEOUT_SECONDS,
+        )
+        await send({
+            "type": "http.response.body",
+            "body": _sse_audio_event(f"data:audio/mp3;base64,{audio_b64}").encode(),
+            "more_body": True,
+        })
+        print("[Milo] Streamed TTS audio to client")
+    except Exception as e:
+        print(f"[Milo] TTS error: {e}")
+
     await send({
         "type": "http.response.body",
         "body": _sse_event("", done=True).encode(),

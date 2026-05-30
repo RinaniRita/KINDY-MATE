@@ -155,14 +155,14 @@ export async function apiPostWithStatus<T>(url: string, body: unknown | FormData
 
 /**
  * Stream an SSE response from /milo/chat/stream/.
- * Calls onChunk(text) for each arriving token, onAudio(base64) for audio chunks, onDone() when finished.
+ * Calls onChunk(text) for each arriving token, onAudio(dataUrl) for audio chunks, onDone() when finished.
  */
 export async function apiStream(
   path: string,
   body: Record<string, unknown>,
   onChunk: (text: string) => void,
   onDone: () => void,
-  onAudio?: (base64: string) => void
+  onAudio?: (audioUrl: string) => void
 ): Promise<void> {
   const token = getAccessToken();
   const url = `${BASE_URL}${path}`;
