@@ -194,12 +194,14 @@ function CloudMouth({ type, s }: { type: MouthType; s: number }) {
 /* ── Main export ───────────────────────────────────────────── */
 
 export function MascotVisual({
-  mood = "hello", size = "md", message, compact = false,
+  mood = "hello", size = "md", message, compact = false, isThinking = false,
 }: {
   mood?:    MascotMood;
   size?:    "sm" | "md" | "lg";
   message?: string;
   compact?: boolean;
+  /** When true, replaces the speech bubble with an animated thinking indicator */
+  isThinking?: boolean;
 }) {
   const [blinking, setBlinking] = useState(false);
   const cfg    = MOODS[mood];
@@ -235,6 +237,7 @@ export function MascotVisual({
   }, []);
 
   const bodyAnim =
+    isThinking         ? "animate-thinking-pulse" :
     mood === "victory" ? "animate-backflip" :
     mood === "wave"    ? "animate-mascot-wave" :
     compact            ? "animate-float-slow" : "animate-float";
@@ -328,23 +331,53 @@ export function MascotVisual({
       )}
 
       {/* Full-mode: speech bubble */}
-      {speech && !compact && (
-        <div className="child-island-card max-w-md rounded-[1.6rem] px-4 py-3 text-center">
-          <p className="relative z-10 text-sm font-black leading-6 text-slate-700">{speech}</p>
+      {!compact && (
+        <div className="child-island-card max-w-md rounded-[1.6rem] px-4 py-3 text-center"
+             style={isThinking ? { background: "linear-gradient(135deg,#dff6ee,#dff0ff)", boxShadow: "0 4px 20px rgba(100,200,180,0.18)" } : {}}>
+          {isThinking ? (
+            /* ── Thinking dots ── */
+            <span className="relative z-10 flex items-center justify-center gap-[6px] py-0.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-teal-400"
+                    style={{ animation: "milo-dot-bounce 1.2s ease-in-out infinite", animationDelay: "0ms" }} />
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-teal-400"
+                    style={{ animation: "milo-dot-bounce 1.2s ease-in-out infinite", animationDelay: "200ms" }} />
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-teal-400"
+                    style={{ animation: "milo-dot-bounce 1.2s ease-in-out infinite", animationDelay: "400ms" }} />
+            </span>
+          ) : speech ? (
+            <p className="relative z-10 text-sm font-black leading-6 text-slate-700">{speech}</p>
+          ) : null}
         </div>
       )}
 
       {/* Compact: tooltip bubble */}
-      {speech && compact && (
-        <div className="animate-pop-in" style={{
-          background: "rgba(255,255,255,.96)",
-          borderRadius: "16px 16px 16px 5px",
-          padding: "8px 12px", maxWidth: "160px",
-          fontSize: "12px", fontWeight: 800, color: "#334155",
-          lineHeight: 1.45, boxShadow: "0 10px 24px rgba(0,0,0,.08)",
-        }}>
-          {speech}
-        </div>
+      {compact && (
+        isThinking ? (
+          <div className="animate-pop-in" style={{
+            background: "linear-gradient(135deg,rgba(223,246,238,.97),rgba(223,240,255,.97))",
+            borderRadius: "16px 16px 16px 5px",
+            padding: "10px 14px",
+            boxShadow: "0 10px 24px rgba(0,0,0,.08)",
+            display: "flex", alignItems: "center", gap: "5px"
+          }}>
+            <span className="inline-block h-2 w-2 rounded-full bg-teal-400"
+                  style={{ animation: "milo-dot-bounce 1.2s ease-in-out infinite", animationDelay: "0ms" }} />
+            <span className="inline-block h-2 w-2 rounded-full bg-teal-400"
+                  style={{ animation: "milo-dot-bounce 1.2s ease-in-out infinite", animationDelay: "200ms" }} />
+            <span className="inline-block h-2 w-2 rounded-full bg-teal-400"
+                  style={{ animation: "milo-dot-bounce 1.2s ease-in-out infinite", animationDelay: "400ms" }} />
+          </div>
+        ) : speech ? (
+          <div className="animate-pop-in" style={{
+            background: "rgba(255,255,255,.96)",
+            borderRadius: "16px 16px 16px 5px",
+            padding: "8px 12px", maxWidth: "160px",
+            fontSize: "12px", fontWeight: 800, color: "#334155",
+            lineHeight: 1.45, boxShadow: "0 10px 24px rgba(0,0,0,.08)",
+          }}>
+            {speech}
+          </div>
+        ) : null
       )}
     </div>
   );

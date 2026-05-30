@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const EMOJIS = ["🍎", "🚗", "🐸", "🐱", "🐻", "🍭", "⚽", "🍦", "🦖", "🍩"];
 
@@ -48,8 +48,11 @@ function generateRandomQuestion(): Question {
 }
 
 export function MathPicturesMission() {
-  const [mounted, setMounted] = useState(false);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<Question[]>(() => [
+    generateRandomQuestion(),
+    generateRandomQuestion(),
+    generateRandomQuestion(),
+  ]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedVal, setSelectedVal] = useState<number | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
@@ -57,20 +60,14 @@ export function MathPicturesMission() {
   const [shake, setShake] = useState(false);
 
   const startNewQuiz = () => {
-    const list = [generateRandomQuestion(), generateRandomQuestion(), generateRandomQuestion()];
-    setQuestions(list);
+    setQuestions([generateRandomQuestion(), generateRandomQuestion(), generateRandomQuestion()]);
     setCurrentIdx(0);
     setSelectedVal(null);
     setIsCorrect(null);
     setQuizFinished(false);
   };
 
-  useEffect(() => {
-    setMounted(true);
-    startNewQuiz();
-  }, []);
-
-  if (!mounted || questions.length === 0) {
+  if (questions.length === 0) {
     return (
       <div className="text-center py-10 font-bold text-slate-500">
         Milo đang chuẩn bị các câu đố phép tính...
@@ -108,9 +105,7 @@ export function MathPicturesMission() {
   };
 
   const renderVisuals = (count: number, emoji: string) => {
-    return Array.from({ length: count })
-      .map((_, i) => emoji)
-      .join("");
+    return emoji.repeat(count);
   };
 
   return (

@@ -46,6 +46,10 @@ export default function SelectProfilePage() {
 
           {loading ? (
             <div className="text-center py-10 font-bold text-slate-400">Đang tìm kiếm hồ sơ...</div>
+          ) : error ? (
+            <div className="text-center py-8 px-4 bg-rose-50 rounded-2xl border border-rose-100">
+              <p className="text-xs font-black text-rose-700">{error}</p>
+            </div>
           ) : children.length === 0 ? (
             <div className="text-center py-8 px-4 bg-slate-50 rounded-2xl border border-slate-200">
               <span className="text-3xl">👧👦</span>

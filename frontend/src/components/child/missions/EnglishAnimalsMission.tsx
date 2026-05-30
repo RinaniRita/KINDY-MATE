@@ -17,33 +17,60 @@ const ALL_WORDS = [
   { text: "BLACK", vi: "Màu đen", icon: "⬛", bg: "bg-slate-100", border: "border-slate-300", textColor: "text-slate-800", viColor: "text-slate-500" },
 ];
 
+type WordCard = (typeof ALL_WORDS)[number];
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechRecognitionResultEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+};
+type SpeechRecognitionErrorEventLike = {
+  error: string;
+};
+
+function getSpeechRecognition() {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+}
+
 function getRandomWords(count: number) {
   const shuffled = [...ALL_WORDS].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, count);
 }
 
 export function EnglishAnimalsMission() {
-  const [currentWords, setCurrentWords] = useState<any[]>([]);
+  const [currentWords, setCurrentWords] = useState<WordCard[]>(() => getRandomWords(4));
   const [completedWords, setCompletedWords] = useState<Set<string>>(new Set());
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const recognitionRef = useRef<any>(null);
-
-  useEffect(() => {
-    setCurrentWords(getRandomWords(4));
-  }, []);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     if (currentWords.length === 0) return;
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = getSpeechRecognition();
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = "en-US";
         
-        recognition.onresult = (event: any) => {
+        recognition.onresult = (event) => {
           let currentTranscript = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
             currentTranscript += event.results[i][0].transcript;
@@ -66,13 +93,12 @@ export function EnglishAnimalsMission() {
           setIsListening(false);
         };
 
-        recognition.onerror = (event: any) => {
+        recognition.onerror = (event) => {
           console.error("Speech recognition error", event.error);
           setIsListening(false);
         };
 
         recognitionRef.current = recognition;
-      }
     }
     
     return () => {
@@ -91,8 +117,8 @@ export function EnglishAnimalsMission() {
       try {
         recognitionRef.current?.start();
         setIsListening(true);
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.error(error);
       }
     }
   };
@@ -163,7 +189,7 @@ export function EnglishAnimalsMission() {
 
             {transcript && (
               <div className="mt-2 text-sm text-slate-500 italic max-w-sm">
-                Milo nghe thấy: "{transcript}"
+                Milo nghe thấy: &ldquo;{transcript}&rdquo;
               </div>
             )}
           </>

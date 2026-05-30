@@ -141,7 +141,7 @@ export function FeatureGrid() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {items.map((item, index) => (
+        {items.map((item) => (
           <Panel 
             key={item.title} 
             className={`interactive-card bg-gradient-to-br ${item.color} relative overflow-hidden`}

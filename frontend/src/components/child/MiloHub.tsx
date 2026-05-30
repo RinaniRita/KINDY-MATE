@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiGetRequired, apiStream } from "@/lib/api";
 
@@ -10,6 +10,32 @@ import { MascotVisual, type MascotMood } from "./MascotVisual";
 import type { ChildDashboardData, ChildProfileData, MissionData } from "./types";
 
 type MiloPrompt = "start" | "rest" | "points";
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  _streamingId?: string;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechRecognitionResultEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+};
+type SpeechRecognitionErrorEventLike = {
+  error: string;
+};
 
 const promptMeta: Record<
   MiloPrompt,
@@ -68,6 +94,15 @@ function replyToMood(text: string): MascotMood {
   return "hello";
 }
 
+function getSpeechRecognition() {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+}
+
 export function MiloHub({ childId }: { childId: string }) {
   const pathname = usePathname();
 
@@ -76,7 +111,7 @@ export function MiloHub({ childId }: { childId: string }) {
   const [missions, setMissions]   = useState<MissionData[]>([]);
   const [loading, setLoading]     = useState(true);
 
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: "Xin chào! Tớ là Milo đây. Hôm nay cậu muốn trò chuyện hay học tập điều gì nào? 🐱✨" },
   ]);
   const [inputText, setInputText] = useState("");
@@ -87,12 +122,12 @@ export function MiloHub({ childId }: { childId: string }) {
   const [micError, setMicError] = useState<string | null>(null);
   const [micSupported, setMicSupported] = useState(true);
 
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const streamingIndexRef = useRef<number>(-1);
-  
-  const audioQueueRef = useRef<string[]>([]);
-  const isPlayingRef = useRef<boolean>(false);
-  const recognitionRef = useRef<any>(null);
+  const chatEndRef        = useRef<HTMLDivElement | null>(null);
+  const sendingRef        = useRef<boolean>(false);
+  const streamSequenceRef = useRef(0);
+  const audioQueueRef     = useRef<string[]>([]);
+  const isPlayingRef      = useRef<boolean>(false);
+  const recognitionRef    = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -120,18 +155,19 @@ export function MiloHub({ childId }: { childId: string }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
-      setMicSupported(false);
-      return;
+      const timer = window.setTimeout(() => setMicSupported(false), 0);
+      return () => window.clearTimeout(timer);
     }
 
-    // Check if we are on a secure context (https or localhost).
     // Speech API is blocked by browsers on plain HTTP non-localhost origins.
     if (!window.isSecureContext) {
-      setMicSupported(false);
-      setMicError("Mic chỉ hoạt động khi truy cập qua https:// hoặc localhost. Hãy mở http://localhost:3000 thay vì dùng địa chỉ IP.");
-      return;
+      const timer = window.setTimeout(() => {
+        setMicSupported(false);
+        setMicError("Mic chỉ hoạt động khi truy cập qua https:// hoặc localhost. Hãy mở http://localhost:3000 thay vì dùng địa chỉ IP.");
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     const recognition = new SpeechRecognition();
@@ -139,7 +175,7 @@ export function MiloHub({ childId }: { childId: string }) {
     recognition.interimResults = true;
     recognition.lang = "vi-VN";
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event) => {
       let currentInterim = "";
       let finalTrans = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -155,7 +191,7 @@ export function MiloHub({ childId }: { childId: string }) {
       setInterimTranscript(currentInterim);
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event) => {
       console.error("Speech recognition error", event.error);
       setIsListening(false);
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
@@ -169,14 +205,13 @@ export function MiloHub({ childId }: { childId: string }) {
     };
 
     recognition.onend = () => {
-      // If recognition stops unexpectedly while we think we're listening, reset state
       setIsListening((prev) => { if (prev) return false; return prev; });
     };
 
     recognitionRef.current = recognition;
   }, []);
 
-  const playNextAudio = useCallback(() => {
+  function playNextAudio() {
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
     isPlayingRef.current = true;
     const base64Audio = audioQueueRef.current.shift()!;
@@ -190,26 +225,25 @@ export function MiloHub({ childId }: { childId: string }) {
       isPlayingRef.current = false;
       playNextAudio();
     });
-  }, []);
+  }
 
   const suggestion = useMemo(() => chooseSuggestion(missions, dashboard), [missions, dashboard]);
 
   async function handleSendText(text: string) {
-    if (!text.trim() || sending) return;
+    if (!text.trim() || sendingRef.current) return;
+    sendingRef.current = true;
 
     const userMsg = { role: "user" as const, content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    streamSequenceRef.current += 1;
+    const streamingId = `streaming_${streamSequenceRef.current}`;
+
+    // Add both messages in a single setState to avoid a render with an orphan userMsg
+    setMessages((prev) => [...prev, userMsg, { role: "assistant", content: "", _streamingId: streamingId }]);
     setInputText("");
     setSending(true);
-    setMiloMood("focus"); // thinking face while waiting
+    setMiloMood("focus");
 
     const screenContext = pathnameToContext(pathname);
-
-    // Add an empty assistant placeholder for streaming
-    setMessages((prev) => {
-      streamingIndexRef.current = prev.length; // index of the placeholder
-      return [...prev, { role: "assistant", content: "" }];
-    });
 
     try {
       let accumulated = "";
@@ -222,14 +256,14 @@ export function MiloHub({ childId }: { childId: string }) {
           history: messages.slice(-6),
           screen_context: screenContext,
         },
-        // onChunk — append text to the streaming placeholder
+        // onChunk — find the placeholder by ID instead of a stale index
         (chunk) => {
           accumulated += chunk;
           setMessages((prev) => {
             const next = [...prev];
-            const idx = streamingIndexRef.current;
-            if (idx >= 0 && next[idx]) {
-              next[idx] = { role: "assistant", content: accumulated };
+            const idx = next.findIndex((message) => message._streamingId === streamingId);
+            if (idx >= 0) {
+              next[idx] = { role: "assistant", content: accumulated, _streamingId: streamingId };
             }
             return next;
           });
@@ -239,9 +273,13 @@ export function MiloHub({ childId }: { childId: string }) {
           if (!accumulated) {
             setMessages((prev) => {
               const next = [...prev];
-              const idx = streamingIndexRef.current;
-              if (idx >= 0 && next[idx]) {
-                next[idx] = { role: "assistant", content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️" };
+              const idx = next.findIndex((message) => message._streamingId === streamingId);
+              if (idx >= 0) {
+                next[idx] = {
+                  role: "assistant",
+                  content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️",
+                  _streamingId: streamingId,
+                };
               }
               return next;
             });
@@ -250,7 +288,7 @@ export function MiloHub({ childId }: { childId: string }) {
             setMiloMood(replyToMood(accumulated));
           }
           setSending(false);
-          streamingIndexRef.current = -1;
+          sendingRef.current = false;
         },
         // onAudio — queue playback
         (base64Audio) => {
@@ -261,15 +299,19 @@ export function MiloHub({ childId }: { childId: string }) {
     } catch {
       setMessages((prev) => {
         const next = [...prev];
-        const idx = streamingIndexRef.current;
-        if (idx >= 0 && next[idx]) {
-          next[idx] = { role: "assistant", content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️" };
+        const idx = next.findIndex((message) => message._streamingId === streamingId);
+        if (idx >= 0) {
+          next[idx] = {
+            role: "assistant",
+            content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️",
+            _streamingId: streamingId,
+          };
         }
         return next;
       });
       setMiloMood("rest");
       setSending(false);
-      streamingIndexRef.current = -1;
+      sendingRef.current = false;
     }
   }
 
@@ -284,12 +326,11 @@ export function MiloHub({ childId }: { childId: string }) {
   const startListening = async () => {
     if (!recognitionRef.current || sending || !micSupported) return;
 
-    // Request mic permission explicitly so the browser shows the permission prompt
-    // before we call recognition.start(), avoiding the silent "not-allowed" error.
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err: any) {
-      const isDenied = err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError";
+    } catch (err) {
+      const errorName = err instanceof DOMException ? err.name : "";
+      const isDenied = errorName === "NotAllowedError" || errorName === "PermissionDeniedError";
       setMicError(
         isDenied
           ? "Bạn đã từ chối quyền mic. Nhấn biểu tượng 🔒 trên thanh địa chỉ → cho phép Microphone."
@@ -310,10 +351,9 @@ export function MiloHub({ childId }: { childId: string }) {
     if (recognitionRef.current && isListening) {
       setIsListening(false);
       recognitionRef.current.stop();
-      // We rely on the final text state, but if we have interim we can also use it
       setTimeout(() => {
         handleSendMessage();
-      }, 500); // give it a moment to process final results
+      }, 500);
     }
   };
 
@@ -342,7 +382,8 @@ export function MiloHub({ childId }: { childId: string }) {
               <MascotVisual
                 mood={miloMood}
                 size="lg"
-                message={sending ? "Milo đang suy nghĩ... 🐱" : "Nhắn tin cho tớ nhé! Tớ sẽ trả lời ngay."}
+                isThinking={sending}
+                message={sending ? undefined : "Nhắn tin cho tớ nhé! Tớ sẽ trả lời ngay."}
               />
             </div>
           </div>
@@ -398,7 +439,7 @@ export function MiloHub({ childId }: { childId: string }) {
                     </span>
                   </div>
                 )}
-                
+
                 {/* Real-time speech transcription preview */}
                 {isListening && (inputText || interimTranscript) && (
                   <div className="max-w-[85%] ml-auto rounded-[1.7rem] border border-emerald-300 bg-emerald-50/80 px-4 py-3 text-sm leading-relaxed shadow-sm font-semibold text-slate-700 opacity-80">
