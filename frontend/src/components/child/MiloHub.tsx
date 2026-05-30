@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiGetRequired, apiStream } from "@/lib/api";
 
@@ -10,6 +10,32 @@ import { MascotVisual, type MascotMood } from "./MascotVisual";
 import type { ChildDashboardData, ChildProfileData, MissionData } from "./types";
 
 type MiloPrompt = "start" | "rest" | "points";
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  _streamingId?: string;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechRecognitionResultEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+};
+type SpeechRecognitionErrorEventLike = {
+  error: string;
+};
 
 const promptMeta: Record<
   MiloPrompt,
@@ -68,6 +94,15 @@ function replyToMood(text: string): MascotMood {
   return "hello";
 }
 
+function getSpeechRecognition() {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+}
+
 export function MiloHub({ childId }: { childId: string }) {
   const pathname = usePathname();
 
@@ -76,7 +111,7 @@ export function MiloHub({ childId }: { childId: string }) {
   const [missions, setMissions]   = useState<MissionData[]>([]);
   const [loading, setLoading]     = useState(true);
 
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: "Xin chào! Tớ là Milo đây. Hôm nay cậu muốn trò chuyện hay học tập điều gì nào? 🐱✨" },
   ]);
   const [inputText, setInputText] = useState("");
@@ -84,13 +119,15 @@ export function MiloHub({ childId }: { childId: string }) {
   const [miloMood, setMiloMood]   = useState<MascotMood>("hello");
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [micError, setMicError] = useState<string | null>(null);
+  const [micSupported, setMicSupported] = useState(true);
 
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const streamingIndexRef = useRef<number>(-1);
-  
-  const audioQueueRef = useRef<string[]>([]);
-  const isPlayingRef = useRef<boolean>(false);
-  const recognitionRef = useRef<any>(null);
+  const chatEndRef        = useRef<HTMLDivElement | null>(null);
+  const sendingRef        = useRef<boolean>(false);
+  const streamSequenceRef = useRef(0);
+  const audioQueueRef     = useRef<string[]>([]);
+  const isPlayingRef      = useRef<boolean>(false);
+  const recognitionRef    = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -116,41 +153,65 @@ export function MiloHub({ childId }: { childId: string }) {
 
   // Initialize Speech Recognition
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "vi-VN";
-        
-        recognition.onresult = (event: any) => {
-          let currentInterim = "";
-          let finalTrans = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTrans += event.results[i][0].transcript;
-            } else {
-              currentInterim += event.results[i][0].transcript;
-            }
-          }
-          if (finalTrans) {
-            setInputText((prev) => prev + finalTrans + " ");
-          }
-          setInterimTranscript(currentInterim);
-        };
-        
-        recognition.onerror = (event: any) => {
-          console.error("Speech recognition error", event.error);
-          setIsListening(false);
-        };
-        
-        recognitionRef.current = recognition;
-      }
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) {
+      const timer = window.setTimeout(() => setMicSupported(false), 0);
+      return () => window.clearTimeout(timer);
     }
+
+    // Speech API is blocked by browsers on plain HTTP non-localhost origins.
+    if (!window.isSecureContext) {
+      const timer = window.setTimeout(() => {
+        setMicSupported(false);
+        setMicError("Mic chỉ hoạt động khi truy cập qua https:// hoặc localhost. Hãy mở http://localhost:3000 thay vì dùng địa chỉ IP.");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "vi-VN";
+
+    recognition.onresult = (event) => {
+      let currentInterim = "";
+      let finalTrans = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTrans += event.results[i][0].transcript;
+        } else {
+          currentInterim += event.results[i][0].transcript;
+        }
+      }
+      if (finalTrans) {
+        setInputText((prev) => prev + finalTrans + " ");
+      }
+      setInterimTranscript(currentInterim);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setMicError("Trình duyệt chưa cấp quyền mic. Hãy nhấn vào biểu tượng 🔒 trên thanh địa chỉ → cho phép Microphone, rồi tải lại trang.");
+        setMicSupported(false);
+      } else if (event.error === "no-speech") {
+        // Benign — user didn't say anything, just reset quietly
+      } else if (event.error === "network") {
+        setMicError("Lỗi mạng khi xử lý giọng nói. Kiểm tra kết nối và thử lại.");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening((prev) => { if (prev) return false; return prev; });
+    };
+
+    recognitionRef.current = recognition;
   }, []);
 
-  const playNextAudio = useCallback(() => {
+  function playNextAudio() {
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
     isPlayingRef.current = true;
     const base64Audio = audioQueueRef.current.shift()!;
@@ -164,26 +225,25 @@ export function MiloHub({ childId }: { childId: string }) {
       isPlayingRef.current = false;
       playNextAudio();
     });
-  }, []);
+  }
 
   const suggestion = useMemo(() => chooseSuggestion(missions, dashboard), [missions, dashboard]);
 
   async function handleSendText(text: string) {
-    if (!text.trim() || sending) return;
+    if (!text.trim() || sendingRef.current) return;
+    sendingRef.current = true;
 
     const userMsg = { role: "user" as const, content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    streamSequenceRef.current += 1;
+    const streamingId = `streaming_${streamSequenceRef.current}`;
+
+    // Add both messages in a single setState to avoid a render with an orphan userMsg
+    setMessages((prev) => [...prev, userMsg, { role: "assistant", content: "", _streamingId: streamingId }]);
     setInputText("");
     setSending(true);
-    setMiloMood("focus"); // thinking face while waiting
+    setMiloMood("focus");
 
     const screenContext = pathnameToContext(pathname);
-
-    // Add an empty assistant placeholder for streaming
-    setMessages((prev) => {
-      streamingIndexRef.current = prev.length; // index of the placeholder
-      return [...prev, { role: "assistant", content: "" }];
-    });
 
     try {
       let accumulated = "";
@@ -196,14 +256,14 @@ export function MiloHub({ childId }: { childId: string }) {
           history: messages.slice(-6),
           screen_context: screenContext,
         },
-        // onChunk — append text to the streaming placeholder
+        // onChunk — find the placeholder by ID instead of a stale index
         (chunk) => {
           accumulated += chunk;
           setMessages((prev) => {
             const next = [...prev];
-            const idx = streamingIndexRef.current;
-            if (idx >= 0 && next[idx]) {
-              next[idx] = { role: "assistant", content: accumulated };
+            const idx = next.findIndex((message) => message._streamingId === streamingId);
+            if (idx >= 0) {
+              next[idx] = { role: "assistant", content: accumulated, _streamingId: streamingId };
             }
             return next;
           });
@@ -213,9 +273,13 @@ export function MiloHub({ childId }: { childId: string }) {
           if (!accumulated) {
             setMessages((prev) => {
               const next = [...prev];
-              const idx = streamingIndexRef.current;
-              if (idx >= 0 && next[idx]) {
-                next[idx] = { role: "assistant", content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️" };
+              const idx = next.findIndex((message) => message._streamingId === streamingId);
+              if (idx >= 0) {
+                next[idx] = {
+                  role: "assistant",
+                  content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️",
+                  _streamingId: streamingId,
+                };
               }
               return next;
             });
@@ -224,7 +288,7 @@ export function MiloHub({ childId }: { childId: string }) {
             setMiloMood(replyToMood(accumulated));
           }
           setSending(false);
-          streamingIndexRef.current = -1;
+          sendingRef.current = false;
         },
         // onAudio — queue playback
         (base64Audio) => {
@@ -235,15 +299,19 @@ export function MiloHub({ childId }: { childId: string }) {
     } catch {
       setMessages((prev) => {
         const next = [...prev];
-        const idx = streamingIndexRef.current;
-        if (idx >= 0 && next[idx]) {
-          next[idx] = { role: "assistant", content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️" };
+        const idx = next.findIndex((message) => message._streamingId === streamingId);
+        if (idx >= 0) {
+          next[idx] = {
+            role: "assistant",
+            content: "Milo đang bận một chút rồi, bé đợi tớ tí xíu nha! 🐱❤️",
+            _streamingId: streamingId,
+          };
         }
         return next;
       });
       setMiloMood("rest");
       setSending(false);
-      streamingIndexRef.current = -1;
+      sendingRef.current = false;
     }
   }
 
@@ -255,23 +323,37 @@ export function MiloHub({ childId }: { childId: string }) {
     }
   }
 
-  const startListening = () => {
-    if (recognitionRef.current && !sending) {
-      setInputText("");
-      setInterimTranscript("");
-      setIsListening(true);
-      recognitionRef.current.start();
+  const startListening = async () => {
+    if (!recognitionRef.current || sending || !micSupported) return;
+
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const errorName = err instanceof DOMException ? err.name : "";
+      const isDenied = errorName === "NotAllowedError" || errorName === "PermissionDeniedError";
+      setMicError(
+        isDenied
+          ? "Bạn đã từ chối quyền mic. Nhấn biểu tượng 🔒 trên thanh địa chỉ → cho phép Microphone."
+          : "Không tìm thấy thiết bị mic. Hãy cắm mic và thử lại."
+      );
+      setMicSupported(false);
+      return;
     }
+
+    setMicError(null);
+    setInputText("");
+    setInterimTranscript("");
+    setIsListening(true);
+    recognitionRef.current.start();
   };
 
   const stopListening = () => {
     if (recognitionRef.current && isListening) {
       setIsListening(false);
       recognitionRef.current.stop();
-      // We rely on the final text state, but if we have interim we can also use it
       setTimeout(() => {
         handleSendMessage();
-      }, 500); // give it a moment to process final results
+      }, 500);
     }
   };
 
@@ -300,7 +382,8 @@ export function MiloHub({ childId }: { childId: string }) {
               <MascotVisual
                 mood={miloMood}
                 size="lg"
-                message={sending ? "Milo đang suy nghĩ... 🐱" : "Nhắn tin cho tớ nhé! Tớ sẽ trả lời ngay."}
+                isThinking={sending}
+                message={sending ? undefined : "Nhắn tin cho tớ nhé! Tớ sẽ trả lời ngay."}
               />
             </div>
           </div>
@@ -356,7 +439,7 @@ export function MiloHub({ childId }: { childId: string }) {
                     </span>
                   </div>
                 )}
-                
+
                 {/* Real-time speech transcription preview */}
                 {isListening && (inputText || interimTranscript) && (
                   <div className="max-w-[85%] ml-auto rounded-[1.7rem] border border-emerald-300 bg-emerald-50/80 px-4 py-3 text-sm leading-relaxed shadow-sm font-semibold text-slate-700 opacity-80">
@@ -368,7 +451,23 @@ export function MiloHub({ childId }: { childId: string }) {
               </div>
             </div>
 
-            <div className="mt-6 border-t border-slate-100/50 pt-5 flex flex-col items-center">
+            <div className="mt-6 border-t border-slate-100/50 pt-5 flex flex-col items-center gap-3">
+              {/* Mic error banner */}
+              {micError && (
+                <div className="w-full rounded-[1.4rem] bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2">
+                  <span className="text-amber-500 text-lg flex-shrink-0">⚠️</span>
+                  <p className="text-xs font-bold text-amber-800 leading-relaxed flex-1">{micError}</p>
+                  <button
+                    type="button"
+                    onClick={() => setMicError(null)}
+                    className="text-amber-400 hover:text-amber-600 text-base leading-none flex-shrink-0"
+                    aria-label="Đóng thông báo"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <button
                 type="button"
                 onMouseDown={startListening}
@@ -376,10 +475,10 @@ export function MiloHub({ childId }: { childId: string }) {
                 onMouseLeave={stopListening}
                 onTouchStart={startListening}
                 onTouchEnd={stopListening}
-                disabled={sending}
+                disabled={sending || !micSupported}
                 className={`group relative flex h-20 w-full max-w-[280px] items-center justify-center rounded-[2rem] font-black shadow-lg transition-all duration-300 select-none ${
-                  sending
-                    ? "bg-slate-200 text-slate-400 opacity-70"
+                  sending || !micSupported
+                    ? "bg-slate-200 text-slate-400 opacity-70 cursor-not-allowed"
                     : isListening
                     ? "bg-emerald-400 text-white scale-[0.98] shadow-inner"
                     : "bg-gradient-to-r from-[#9dd9c6] to-[#bde6d9] text-slate-800 hover:shadow-xl hover:scale-[1.02]"
@@ -392,19 +491,19 @@ export function MiloHub({ childId }: { childId: string }) {
                 <span className="relative z-10 flex items-center gap-3 text-lg">
                   {sending ? (
                     "Đang gửi..."
+                  ) : !micSupported ? (
+                    <>🎤 Mic không khả dụng</>
                   ) : isListening ? (
                     <>
                       <span className="animate-pulse">🔴</span> Đang nghe...
                     </>
                   ) : (
-                    <>
-                      🎤 Nhấn giữ để nói
-                    </>
+                    <>🎤 Nhấn giữ để nói</>
                   )}
                 </span>
               </button>
 
-              <div className="mt-4 flex gap-3">
+              <div className="flex gap-3">
                 <Link
                   href={`/child/${childId}/mascot`}
                   className="rounded-[1.4rem] border border-slate-200 bg-white px-5 py-3 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 transition"

@@ -17,11 +17,19 @@ function getAccessToken(): string | null {
   const raw = window.localStorage.getItem("kindy_mate_auth_session");
   if (!raw) return null;
   try {
-    const session = JSON.parse(raw);
-    return session?.access || null;
+    const session = JSON.parse(raw) as { access?: unknown };
+    return typeof session.access === "string" ? session.access : null;
   } catch {
     return null;
   }
+}
+
+function readErrorMessage(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
+  const payload = data as { detail?: unknown; message?: unknown };
+  if (typeof payload.detail === "string") return payload.detail;
+  if (typeof payload.message === "string") return payload.message;
+  return JSON.stringify(data) || fallback;
 }
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -51,9 +59,7 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     let errorMessage = `Yêu cầu thất bại với mã lỗi ${response.status}`;
     try {
       const errorData = await response.json();
-      if (errorData && typeof errorData === "object") {
-        errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData) || errorMessage;
-      }
+      errorMessage = readErrorMessage(errorData, errorMessage);
     } catch {
       // Ignore parse failure and fall back
     }
@@ -82,7 +88,7 @@ export async function apiGet<T>(url: string, defaultValue?: T, options?: Request
   }
 }
 
-export async function apiPost<T>(url: string, body: any, options?: RequestInit): Promise<T> {
+export async function apiPost<T>(url: string, body: unknown, options?: RequestInit): Promise<T> {
   return request<T>(url, {
     ...options,
     method: "POST",
@@ -90,7 +96,7 @@ export async function apiPost<T>(url: string, body: any, options?: RequestInit):
   });
 }
 
-export async function apiPatch<T>(url: string, body: any, options?: RequestInit): Promise<T> {
+export async function apiPatch<T>(url: string, body: unknown, options?: RequestInit): Promise<T> {
   return request<T>(url, {
     ...options,
     method: "PATCH",
@@ -102,7 +108,7 @@ export async function apiDelete<T>(url: string, options?: RequestInit): Promise<
   return request<T>(url, { ...options, method: "DELETE" });
 }
 
-export async function apiPostWithStatus<T>(url: string, body: any, options?: RequestInit): Promise<{ ok: boolean, status: number, data: T }> {
+export async function apiPostWithStatus<T>(url: string, body: unknown | FormData, options?: RequestInit): Promise<{ ok: boolean, status: number, data: T }> {
   try {
     const token = getAccessToken();
     const headers = new Headers(options?.headers);
@@ -141,7 +147,7 @@ export async function apiPostWithStatus<T>(url: string, body: any, options?: Req
     }
 
     return { ok: response.ok, status: response.status, data: data as T };
-  } catch (error) {
+  } catch {
     return { ok: false, status: 0, data: {} as T };
   }
 }
@@ -161,14 +167,12 @@ export async function apiStream(
   const token = getAccessToken();
   const url = `${BASE_URL}${path}`;
   console.log('[Milo] apiStream calling:', url);
-  console.log('[Milo] Token present:', !!token);
 
   const controller = new AbortController();
 
-  // Watchdog timer to prevent stream hanging (10s threshold, checks every 2s)
   let lastActivity = Date.now();
   const watchdog = setInterval(() => {
-    if (Date.now() - lastActivity > 10000) {
+    if (Date.now() - lastActivity > 15000) {
       console.error('[Milo] Stream watchdog timeout. Aborting...');
       controller.abort();
       clearInterval(watchdog);
@@ -189,11 +193,7 @@ export async function apiStream(
   } catch (fetchErr) {
     clearInterval(watchdog);
     const error = fetchErr as Error;
-    if (error.name === 'AbortError') {
-      console.error('[Milo] fetch() timed out or aborted');
-      throw new Error('Connection timed out');
-    }
-    console.error('[Milo] fetch() failed (network error):', fetchErr);
+    if (error.name === 'AbortError') throw new Error('Connection timed out');
     throw fetchErr;
   }
 
@@ -211,16 +211,25 @@ export async function apiStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
-      lastActivity = Date.now(); // Update timestamp on chunk activity
-
+      lastActivity = Date.now();
       if (done) break;
+
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
+
+      // ── FIX: split on \r\n or \n, strip \r from each line ──────────────────
+      const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() ?? '';
-      for (const line of lines) {
+
+      for (const rawLine of lines) {
+        const line = rawLine.trimEnd(); // strip trailing \r if any
+        if (line.startsWith(':')) { lastActivity = Date.now(); continue; }
         if (!line.startsWith('data: ')) continue;
+
+        const jsonStr = line.slice(6).trim(); // 'data: ' = 6 chars
+        if (!jsonStr) continue;
+
         try {
-          const parsed = JSON.parse(line.slice(6)) as { chunk?: string; audio?: string; done: boolean };
+          const parsed = JSON.parse(jsonStr) as { chunk?: string; audio?: string; done: boolean };
           if (parsed.chunk) onChunk(parsed.chunk);
           if (parsed.audio && onAudio) onAudio(parsed.audio);
           if (parsed.done) {
@@ -228,7 +237,9 @@ export async function apiStream(
             onDone();
             return;
           }
-        } catch { /* ignore malformed */ }
+        } catch (e) {
+          console.error('[Milo] Failed to parse SSE line:', JSON.stringify(line), e);
+        }
       }
     }
   } finally {
@@ -237,9 +248,7 @@ export async function apiStream(
   }
 
   if (!receivedDone) {
-    console.error('[Milo] Stream terminated prematurely without done signal');
-    throw new Error('Stream terminated prematurely');
+    console.error('[Milo] Stream terminated without done signal');
+    onDone(); // gọi onDone thay vì throw để UI không bị treo
   }
-
-  onDone();
 }

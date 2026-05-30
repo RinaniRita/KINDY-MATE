@@ -104,10 +104,12 @@ export function PersistentMascot({ childId }: { childId: string }) {
   /* ── Route-change greeting ── */
   useEffect(() => {
     const { mood, speech } = routeToState(pathname);
+    const frame = window.requestAnimationFrame(() => {
+      setActiveMood(mood);
+      setActiveSpeech(speech);
+    });
     // Clear any existing greeting timer
     if (greetingTimer.current) clearTimeout(greetingTimer.current);
-    setActiveMood(mood);
-    setActiveSpeech(speech);
     // After GREETING_DURATION_MS, clear the speech but keep the mood
     if (speech) {
       greetingTimer.current = setTimeout(() => {
@@ -115,6 +117,7 @@ export function PersistentMascot({ childId }: { childId: string }) {
       }, GREETING_DURATION_MS);
     }
     return () => {
+      window.cancelAnimationFrame(frame);
       if (greetingTimer.current) clearTimeout(greetingTimer.current);
     };
   }, [pathname]);
@@ -151,7 +154,6 @@ export function PersistentMascot({ childId }: { childId: string }) {
       window.removeEventListener("pointerdown", resetIdle);
       window.removeEventListener("keydown", resetIdle);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   /* ── Hide on certain routes ── */

@@ -27,7 +27,7 @@ services:
       sh -c "uv run manage.py migrate &&
              uv run manage.py seed_demo &&
              uv run manage.py seed_curated_content &&
-             uv run gunicorn config.wsgi:application -k gevent -w 1 --bind 0.0.0.0:8000 --timeout 30"
+             uv run uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --loop uvloop --timeout-keep-alive 75"
     env_file:
       - .env
     environment:

@@ -78,7 +78,7 @@ export function VideoPlayerPage({ childId }: VideoPlayerPageProps) {
   );
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6" data-child-id={childId}>
       <section className="child-scene-shell rounded-[2.4rem] px-5 py-6 md:px-8 md:py-8">
         <div className="relative z-10 max-w-2xl">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Rạp Chiếu Phim</p>

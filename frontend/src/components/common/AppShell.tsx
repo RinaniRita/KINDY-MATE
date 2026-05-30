@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { PersistentMascot } from "@/components/child/PersistentMascot";
 import { apiPatch, apiPost, apiPostWithStatus, type AuthResponse } from "@/lib/api";
@@ -291,38 +291,41 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
 
   const themeTag = tone === "child" ? "Khu trẻ em" : tone === "parent" ? "Phụ huynh" : "Kindy-Mate";
 
-  const [logoHref, setLogoHref] = useState("/");
-
-  useEffect(() => {
+  const logoHref = useMemo(() => {
     let computedHref = "/";
     if (tone === "parent") {
       computedHref = "/parent/dashboard";
-    } else if (tone === "child") {
+    } else if (tone === "child" && typeof window !== "undefined") {
       const activeChildId = window.localStorage.getItem("active_child_id") || "";
       computedHref = activeChildId ? `/child/${activeChildId}/home` : "/child/select-profile";
     } else if (readAuthSession()?.access) {
       computedHref = "/parent/dashboard";
     }
-    setLogoHref(computedHref);
-  }, [tone, childId]);
+    return computedHref;
+  }, [tone]);
 
-  function openParentGate(mode: PinMode = hasParentPin() ? "verify" : "setup") {
-    handleClear();
-    setSetupDraft("");
-    setPinMode(mode);
-    setShowPasscodeModal(true);
-  }
+  const handleClear = useCallback(() => {
+    setPin("");
+    setPinError("");
+  }, []);
 
-  function shakeWithMessage(message: string) {
+  const shakeWithMessage = useCallback((message: string) => {
     setIsShaking(true);
     setPinError(message);
     setTimeout(() => {
       setIsShaking(false);
       setPin("");
     }, 700);
-  }
+  }, []);
 
-  async function submitPin(nextPin: string) {
+  const openParentGate = useCallback((mode: PinMode = hasParentPin() ? "verify" : "setup") => {
+    handleClear();
+    setSetupDraft("");
+    setPinMode(mode);
+    setShowPasscodeModal(true);
+  }, [handleClear]);
+
+  const submitPin = useCallback(async (nextPin: string) => {
     if (pinBusy) return;
     setPinBusy(true);
     setPinError("");
@@ -362,9 +365,9 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
     } finally {
       setPinBusy(false);
     }
-  }
+  }, [handleClear, pinBusy, pinMode, router, setupDraft, shakeWithMessage]);
 
-  function handleKeyPress(num: string) {
+  const handleKeyPress = useCallback((num: string) => {
     if (pinBusy || pin.length >= 4) return;
     setPinError("");
     const newPin = pin + num;
@@ -372,24 +375,19 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
     if (newPin.length === 4) {
       void submitPin(newPin);
     }
-  }
+  }, [pin, pinBusy, submitPin]);
 
-  function handleBackspace() {
+  const handleBackspace = useCallback(() => {
     setPinError("");
     setPin((current) => current.slice(0, -1));
-  }
+  }, []);
 
-  function handleClear() {
-    setPin("");
-    setPinError("");
-  }
-
-  function closePinModal() {
+  const closePinModal = useCallback(() => {
     if (pinMode === "setup" && !hasParentPin()) return;
     handleClear();
     setSetupDraft("");
     setShowPasscodeModal(false);
-  }
+  }, [handleClear, pinMode]);
 
   function startGuardianHold() {
     if (holdTimer.current) clearTimeout(holdTimer.current);
@@ -422,7 +420,7 @@ export function AppShell({ children, nav, subtitle, title, tone = "public", chil
 
     window.addEventListener("keydown", handleKeyboard);
     return () => window.removeEventListener("keydown", handleKeyboard);
-  }, [showPasscodeModal]);
+  }, [showPasscodeModal, handleKeyPress, handleBackspace, closePinModal]);
 
   return (
     <main className={`min-h-screen ${!isChildTone ? "pb-16" : ""} selection:bg-[#dff6ee] selection:text-slate-800 ${isChildTone ? "bg-gradient-to-b from-[#fff7ea] via-[#eef8ff] to-[#ecfaf3]" : "bg-[#fffdf7]"}`}>
