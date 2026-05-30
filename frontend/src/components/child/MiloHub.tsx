@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiGetRequired, apiStream } from "@/lib/api";
 
+import { MicPermissionModal } from "../common/MicPermissionModal";
 import { MascotVisual, type MascotMood } from "./MascotVisual";
 import type { ChildDashboardData, ChildProfileData, MissionData } from "./types";
 
@@ -121,6 +122,9 @@ export function MiloHub({ childId }: { childId: string }) {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [micError, setMicError] = useState<string | null>(null);
   const [micSupported, setMicSupported] = useState(true);
+  const [showMicModal, setShowMicModal] = useState(false);
+  // true once the user has explicitly granted mic access this session
+  const micGrantedRef = useRef(false);
 
   const chatEndRef        = useRef<HTMLDivElement | null>(null);
   const sendingRef        = useRef<boolean>(false);
@@ -200,7 +204,8 @@ export function MiloHub({ childId }: { childId: string }) {
       } else if (event.error === "no-speech") {
         // Benign — user didn't say anything, just reset quietly
       } else if (event.error === "network") {
-        setMicError("Lỗi mạng khi xử lý giọng nói. Kiểm tra kết nối và thử lại.");
+        // Transient network issue — don't disable the mic button, just show a retry hint
+        setMicError("Lỗi kết nối mạng khi xử lý giọng nói. Thử lại nhé!");
       }
     };
 
@@ -214,8 +219,10 @@ export function MiloHub({ childId }: { childId: string }) {
   function playNextAudio() {
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
     isPlayingRef.current = true;
-    const base64Audio = audioQueueRef.current.shift()!;
-    const audio = new Audio(`data:audio/wav;base64,${base64Audio}`);
+    const audioSource = audioQueueRef.current.shift()!;
+    const audio = new Audio(
+      audioSource.startsWith("data:") ? audioSource : `data:audio/mp3;base64,${audioSource}`
+    );
     audio.onended = () => {
       isPlayingRef.current = false;
       playNextAudio();
@@ -291,8 +298,8 @@ export function MiloHub({ childId }: { childId: string }) {
           sendingRef.current = false;
         },
         // onAudio — queue playback
-        (base64Audio) => {
-          audioQueueRef.current.push(base64Audio);
+        (audioUrl) => {
+          audioQueueRef.current.push(audioUrl);
           playNextAudio();
         }
       );
@@ -323,23 +330,42 @@ export function MiloHub({ childId }: { childId: string }) {
     }
   }
 
-  const startListening = async () => {
+  /** Called by MicPermissionModal once the browser has granted access. */
+  function handleMicGranted() {
+    micGrantedRef.current = true;
+    setShowMicModal(false);
+    setMicError(null);
+    setInputText("");
+    setInterimTranscript("");
+    setIsListening(true);
+    recognitionRef.current?.start();
+  }
+
+  /** Called by MicPermissionModal when access is denied or user dismissed. */
+  function handleMicDenied(reason: "user-dismissed" | "not-allowed" | "no-device" | "unknown") {
+    setShowMicModal(false);
+    if (reason === "user-dismissed") return;
+    if (reason === "not-allowed") {
+      setMicError("Bạn đã từ chối quyền mic. Nhấn biểu tượng 🔒 trên thanh địa chỉ → cho phép Microphone, rồi tải lại trang.");
+      setMicSupported(false);
+    } else if (reason === "no-device") {
+      setMicError("Không tìm thấy thiết bị mic. Hãy cắm mic và thử lại.");
+      setMicSupported(false);
+    } else {
+      setMicError("Không thể khởi động mic. Thử tải lại trang.");
+    }
+  }
+
+  const startListening = () => {
     if (!recognitionRef.current || sending || !micSupported) return;
 
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err) {
-      const errorName = err instanceof DOMException ? err.name : "";
-      const isDenied = errorName === "NotAllowedError" || errorName === "PermissionDeniedError";
-      setMicError(
-        isDenied
-          ? "Bạn đã từ chối quyền mic. Nhấn biểu tượng 🔒 trên thanh địa chỉ → cho phép Microphone."
-          : "Không tìm thấy thiết bị mic. Hãy cắm mic và thử lại."
-      );
-      setMicSupported(false);
+    // First time this session: show the explanatory modal before calling getUserMedia
+    if (!micGrantedRef.current) {
+      setShowMicModal(true);
       return;
     }
 
+    // Permission already granted — start immediately
     setMicError(null);
     setInputText("");
     setInterimTranscript("");
@@ -366,6 +392,14 @@ export function MiloHub({ childId }: { childId: string }) {
   }
 
   return (
+    <>
+    {showMicModal && (
+      <MicPermissionModal
+        onGranted={handleMicGranted}
+        onDenied={handleMicDenied}
+        onClose={() => setShowMicModal(false)}
+      />
+    )}
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <section className="child-scene-shell rounded-[2.4rem] px-5 py-6 md:px-8 md:py-8">
         <div className="relative z-10 space-y-6">
@@ -542,5 +576,6 @@ export function MiloHub({ childId }: { childId: string }) {
         </section>
       </div>
     </div>
+    </>
   );
 }
